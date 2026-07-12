@@ -2,8 +2,14 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Ferari Impianti — Gestionale</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#10133a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ferari">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
+<title>Ferari Impianti</title>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/@babel/standalone@7.26.10/babel.min.js"></script>
@@ -11,12 +17,39 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  html, body, #root { height: 100%; }
+  html {
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    background: #eef1f5;
+    overscroll-behavior: none;
+    -webkit-font-smoothing: antialiased;
+  }
   #errbox { display:none; padding:24px; font-family:monospace; font-size:13px; color:#b91c1c;
             background:#fef2f2; border:1px solid #fecaca; margin:24px; border-radius:8px;
             white-space:pre-wrap; }
   .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-  html { -webkit-tap-highlight-color: transparent; }
+  .app-scroll { -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+  .app-page { animation: appEnter 0.24s ease-out both; }
+  @keyframes appEnter {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .app-card {
+    background: #fff;
+    border-radius: 1rem;
+    box-shadow: 0 1px 2px rgba(16, 19, 58, 0.04), 0 4px 16px rgba(16, 19, 58, 0.06);
+  }
+  @media (min-width: 1024px) {
+    .app-card { border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+  }
+  .app-input {
+    font-size: 16px;
+  }
 </style>
 </head>
 <body>
@@ -683,76 +716,72 @@ function LoginPage({ onLogin }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-      <div className="w-full max-w-sm">
+    <div className="min-h-[100dvh] lg:min-h-screen bg-[#10133a] flex flex-col">
+      <div className="flex-1 flex flex-col items-center justify-center px-6 pt-[max(2rem,env(safe-area-inset-top))] pb-8 lg:pb-0">
+        <img src={LOGO_BASE64} alt="Ferari Impianti" className="w-20 h-20 rounded-2xl shadow-2xl shadow-black/30 mb-5" />
+        <h1 className="text-2xl font-bold text-white tracking-tight">Ferari Impianti</h1>
+        <p className="text-sm text-white/60 mt-1.5">Gestionale preventivi</p>
+      </div>
 
-        <div className="flex flex-col items-center mb-8">
-          <img src={LOGO_BASE64} alt="Ferari Impianti" className="w-16 h-16 rounded-2xl shadow-sm mb-4" />
-          <h1 className="text-xl font-semibold text-slate-900 tracking-tight">Ferari Impianti</h1>
-          <p className="text-sm text-slate-500 mt-1">Accedi al tuo gestionale</p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="nome@ferariimpianti.it"
-                  className="w-full pl-10 pr-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-colors"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-10 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-colors"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between text-xs pt-1">
-              <label className="flex items-center gap-1.5 text-slate-500">
-                <input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500/30" />
-                Ricordami
-              </label>
-              <a href="#" className="text-blue-600 font-medium hover:text-blue-700">Password dimenticata?</a>
+      <form onSubmit={handleSubmit} className="bg-white rounded-t-[1.75rem] lg:rounded-2xl px-6 pt-7 pb-[max(1.75rem,env(safe-area-inset-bottom))] lg:pb-6 shadow-[0_-8px_40px_rgba(0,0,0,0.18)] lg:shadow-sm w-full max-w-sm mx-auto lg:my-auto lg:mb-8">
+        <p className="text-base font-semibold text-slate-900 mb-5">Accedi</p>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Email</label>
+            <div className="relative">
+              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="nome@ferariimpianti.it"
+                className="app-input w-full pl-10 pr-3 py-3 text-sm bg-slate-100 border-0 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/40 transition-colors"
+                required
+              />
             </div>
           </div>
 
-          <button
-            type="submit"
-            className="w-full mt-6 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
-          >
-            Accedi
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </form>
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Password</label>
+            <div className="relative">
+              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="app-input w-full pl-10 pr-10 py-3 text-sm bg-slate-100 border-0 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/40 transition-colors"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 p-1"
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
 
-        <p className="text-center text-xs text-slate-400 mt-6">
-          Ferari Impianti S.r.l. · Gestionale Preventivi v1.0
-        </p>
-      </div>
+          <div className="flex items-center justify-between text-xs pt-1">
+            <label className="flex items-center gap-2 text-slate-500">
+              <input type="checkbox" className="rounded border-slate-300 text-blue-600 w-4 h-4" />
+              Ricordami
+            </label>
+            <button type="button" className="text-blue-600 font-semibold">Password dimenticata?</button>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          className="w-full mt-6 bg-[#10133a] active:scale-[0.98] text-white text-sm font-bold py-3.5 rounded-xl transition-transform flex items-center justify-center gap-2 shadow-lg shadow-[#10133a]/20"
+        >
+          Entra nell&apos;app
+          <ChevronRight className="w-4 h-4" />
+        </button>
+
+        <p className="text-center text-[11px] text-slate-400 mt-5">v1.0 · Ferari Impianti S.r.l.</p>
+      </form>
     </div>
   );
 }
@@ -862,31 +891,44 @@ function Sidebar({ currentPage, setCurrentPage, onLogout, mobileOpen, onMobileCl
 
 function TopBar({ title, subtitle, onMenuClick }) {
   return (
-    <header className="bg-white border-b border-slate-200 px-4 sm:px-6 lg:px-8 py-4 lg:py-5 flex items-center justify-between gap-3 sticky top-0 z-30">
-      <div className="flex items-center gap-3 min-w-0">
-        <button type="button" onClick={onMenuClick} className="lg:hidden w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 shrink-0" aria-label="Apri menu">
-          <Menu className="w-[18px] h-[18px]" />
-        </button>
+    <>
+      <header className="lg:hidden bg-[#10133a] text-white shrink-0 pt-[max(0.5rem,env(safe-area-inset-top))]">
+        <div className="px-4 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <img src={LOGO_BASE64} alt="" className="w-8 h-8 rounded-lg shrink-0 ring-1 ring-white/10" />
+            <span className="text-sm font-semibold text-white/90 truncate">Ferari Impianti</span>
+          </div>
+          <button type="button" onClick={onMenuClick} className="w-10 h-10 rounded-full bg-white/10 active:bg-white/20 flex items-center justify-center shrink-0" aria-label="Menu">
+            <Menu className="w-5 h-5 text-white" />
+          </button>
+        </div>
+        <div className="px-4 pb-4">
+          <h1 className="text-[1.65rem] font-bold tracking-tight leading-tight">{title}</h1>
+          {subtitle && <p className="text-sm text-white/65 mt-0.5">{subtitle}</p>}
+        </div>
+      </header>
+
+      <header className="hidden lg:flex bg-white border-b border-slate-200 px-8 py-5 items-center justify-between gap-3 shrink-0">
         <div className="min-w-0">
-          <h1 className="text-lg sm:text-xl font-semibold text-slate-900 tracking-tight truncate">{title}</h1>
+          <h1 className="text-xl font-semibold text-slate-900 tracking-tight truncate">{title}</h1>
           {subtitle && <p className="text-sm text-slate-500 mt-0.5 truncate">{subtitle}</p>}
         </div>
-      </div>
-      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        <div className="relative hidden md:block">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Cerca..."
-            className="pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 w-44 lg:w-56 transition-colors"
-          />
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Cerca..."
+              className="pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 w-56 transition-colors"
+            />
+          </div>
+          <button type="button" className="relative w-9 h-9 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors">
+            <Bell className="w-4 h-4" />
+            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
+          </button>
         </div>
-        <button type="button" className="relative w-9 h-9 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors">
-          <Bell className="w-4 h-4" />
-          <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
-        </button>
-      </div>
-    </header>
+      </header>
+    </>
   );
 }
 
@@ -899,25 +941,66 @@ function MobileBottomNav({ currentPage, setCurrentPage }) {
   ];
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-40 lg:hidden bg-white/95 backdrop-blur border-t border-slate-200 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-      <div className="grid grid-cols-4">
-        {items.map(function (item) {
-          const Icon = item.icon;
-          const isActive = currentPage === item.id;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setCurrentPage(item.id)}
-              className={`flex flex-col items-center justify-center gap-0.5 py-2.5 px-1 text-[10px] font-semibold transition-colors ${isActive ? 'text-blue-700' : 'text-slate-500'}`}
-            >
-              <Icon className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
-              {item.label}
-            </button>
-          );
-        })}
+    <nav className="fixed bottom-0 inset-x-0 z-40 lg:hidden">
+      <div className="mx-3 mb-[max(0.5rem,env(safe-area-inset-bottom))] app-card rounded-2xl px-1 py-1 shadow-lg shadow-slate-900/10 border-0">
+        <div className="grid grid-cols-4">
+          {items.map(function (item) {
+            const Icon = item.icon;
+            const isActive = currentPage === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setCurrentPage(item.id)}
+                className={`relative flex flex-col items-center justify-center gap-0.5 py-2 px-1 rounded-xl transition-all active:scale-95 ${isActive ? 'text-blue-700' : 'text-slate-400'}`}
+              >
+                {isActive && <span className="absolute inset-x-1 inset-y-0.5 bg-blue-50 rounded-xl -z-10" />}
+                <Icon className={`w-[22px] h-[22px] ${isActive ? 'text-blue-600' : 'text-slate-400'}`} strokeWidth={isActive ? 2.25 : 2} />
+                <span className="text-[10px] font-bold">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </nav>
+  );
+}
+
+function PreventivoMobileList({ items, onSelect }) {
+  if (!items.length) {
+    return <p className="md:hidden px-4 py-10 text-center text-sm text-slate-400">Nessun preventivo ancora.</p>;
+  }
+  return (
+    <div className="md:hidden divide-y divide-slate-100">
+      {items.map(function (p) {
+        return (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => onSelect && onSelect(p)}
+            className="w-full px-4 py-3.5 flex items-center gap-3 text-left active:bg-slate-50 transition-colors"
+          >
+            <div className="w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+              <FileText className="w-5 h-5 text-slate-500" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-slate-900 truncate">{p.cliente}</p>
+                <p className="text-sm font-bold text-slate-900 shrink-0">{fmtEuro(p.importo)}</p>
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[11px] font-mono text-slate-400">{p.id}</span>
+                <span className="text-slate-300">·</span>
+                <span className="text-[11px] text-slate-400 truncate">{p.data}</span>
+              </div>
+            </div>
+            <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${statoStyle[p.stato]}`}>
+              {p.stato}
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -927,7 +1010,7 @@ function MobileBottomNav({ currentPage, setCurrentPage }) {
 
 function StatCard({ label, value, delta, icon: Icon, accent }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5">
+    <div className="app-card p-4 lg:p-5">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-medium text-slate-500">{label}</p>
@@ -953,7 +1036,7 @@ function DashboardCards({ preventivi, clienti }) {
   const inAttesa = preventivi.filter(p => p.stato === 'In Attesa').length;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
       <StatCard
         label="Preventivi"
         value={String(preventivi.length)}
@@ -989,18 +1072,18 @@ function DashboardCards({ preventivi, clienti }) {
 function PreventiviTable({ preventivi, onVediTutti }) {
   const recenti = preventivi.slice(0, 6);
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-        <div>
-          <h2 className="text-sm font-semibold text-slate-900">Preventivi Recenti</h2>
-        </div>
-        <button onClick={onVediTutti} className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700">
+    <div className="app-card overflow-hidden">
+      <div className="px-4 lg:px-5 py-4 flex items-center justify-between">
+        <h2 className="text-sm font-bold text-slate-900">Preventivi Recenti</h2>
+        <button onClick={onVediTutti} className="flex items-center gap-1 text-xs font-bold text-blue-600 active:opacity-70">
           Vedi tutti
           <ChevronRight className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      <div className="overflow-x-auto">
+      <PreventivoMobileList items={recenti} onSelect={onVediTutti} />
+
+      <div className="hidden md:block overflow-x-auto border-t border-slate-100">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100">
@@ -1049,7 +1132,7 @@ function PreventiviTable({ preventivi, onVediTutti }) {
 
 function DashboardPage({ preventivi, clienti, onVediTutti }) {
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6">
+    <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 lg:space-y-6">
       <DashboardCards preventivi={preventivi} clienti={clienti} />
       <PreventiviTable preventivi={preventivi} onVediTutti={onVediTutti} />
     </div>
@@ -1119,7 +1202,7 @@ function ClientiPage({ clienti, setClienti, preventivi, onNuovoPreventivo }) {
           Torna ai clienti
         </button>
 
-        <div className="bg-white border border-slate-200 rounded-2xl p-6">
+        <div className="app-card p-6">
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-2xl bg-slate-900 flex items-center justify-center text-white font-bold text-lg shrink-0">
@@ -1153,7 +1236,7 @@ function ClientiPage({ clienti, setClienti, preventivi, onNuovoPreventivo }) {
           )}
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+        <div className="app-card overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100">
             <h3 className="text-sm font-semibold text-slate-900">Storico preventivi</h3>
             <p className="text-xs text-slate-400 mt-0.5">{storicoCliente.length} documenti</p>
@@ -1183,7 +1266,7 @@ function ClientiPage({ clienti, setClienti, preventivi, onNuovoPreventivo }) {
           )}
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+        <div className="app-card overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100">
             <h3 className="text-sm font-semibold text-slate-900">Note e comunicazioni</h3>
           </div>
@@ -1240,7 +1323,7 @@ function ClientiPage({ clienti, setClienti, preventivi, onNuovoPreventivo }) {
       </div>
 
       {showNewForm && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-4">
+        <div className="app-card p-4">
           <p className="text-xs font-semibold text-slate-500 mb-3">Nuovo cliente</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <input
@@ -1276,7 +1359,7 @@ function ClientiPage({ clienti, setClienti, preventivi, onNuovoPreventivo }) {
         </div>
       )}
 
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+      <div className="app-card overflow-hidden">
         <div className="divide-y divide-slate-50">
           {filtered.map(c => {
             const docCount = preventivi.filter(p => p.clienteId === c.id).length;
@@ -1345,7 +1428,7 @@ function NuovoClienteInline({ onSalva }) {
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-6">
+    <div className="app-card p-6">
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm font-semibold text-slate-900">Nuovo cliente</p>
         <button onClick={() => setAperto(false)} className="text-slate-400 hover:text-slate-600">
@@ -1579,8 +1662,8 @@ function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materi
   /* ---- vista lista ---- */
   if (mode === 'lista') {
     return (
-      <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
-        <div className="flex items-center justify-end">
+      <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5 relative">
+        <div className="hidden lg:flex items-center justify-end">
           <button
             onClick={startNuovo}
             className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors"
@@ -1590,8 +1673,13 @@ function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materi
           </button>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <div className="overflow-x-auto">
+        <div className="app-card overflow-hidden">
+          <PreventivoMobileList
+            items={preventivi}
+            onSelect={(p) => { setDettaglioId(p.id); setMode('dettaglio'); }}
+          />
+
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100">
@@ -1650,6 +1738,15 @@ function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materi
             </table>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={startNuovo}
+          className="lg:hidden fixed right-4 z-30 w-14 h-14 rounded-full bg-blue-600 text-white shadow-xl shadow-blue-600/35 flex items-center justify-center active:scale-95 transition-transform bottom-[calc(5.25rem+env(safe-area-inset-bottom))]"
+          aria-label="Nuovo preventivo"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
       </div>
     );
   }
@@ -1670,7 +1767,7 @@ function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materi
           Torna ai preventivi
         </button>
 
-        <div className="bg-white border border-slate-200 rounded-2xl px-6 py-5 flex items-center justify-between flex-wrap gap-3">
+        <div className="app-card px-6 py-5 flex items-center justify-between flex-wrap gap-3">
           <div>
             <p className="font-mono text-xs text-slate-400">{p.id}</p>
             <p className="text-lg font-bold text-slate-900 mt-0.5">{clienteDett?.nome || p.cliente}</p>
@@ -1683,7 +1780,7 @@ function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materi
         </div>
 
         {(p.zone || []).length > 0 && (
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="app-card overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100">
               <p className="text-sm font-semibold text-slate-900">Lavorazioni per zona</p>
             </div>
@@ -1713,7 +1810,7 @@ function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materi
         )}
 
         {p.nFoto > 0 && (
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="app-card overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100">
               <p className="text-sm font-semibold text-slate-900">Foto cantiere ({p.nFoto})</p>
             </div>
@@ -1762,7 +1859,7 @@ function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materi
       {!cliente ? (
         <div className="max-w-lg space-y-4">
           {/* Selezione cliente esistente */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-6">
+          <div className="app-card p-6">
             <p className="text-sm font-semibold text-slate-900 mb-1">Seleziona il cliente</p>
             <p className="text-xs text-slate-400 mb-4">Per quale cliente stai preparando questo preventivo?</p>
             <select
@@ -1796,13 +1893,13 @@ function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materi
 
           <div className="space-y-5 min-w-0">
 
-            <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4">
+            <div className="app-card px-5 py-4">
               <p className="text-[11px] text-slate-400 uppercase tracking-wide font-semibold">Preventivo per</p>
               <p className="text-sm font-bold text-slate-900 mt-0.5">{cliente.nome} · {cliente.indirizzo}</p>
             </div>
 
             {/* zona / ambiente attivo */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="app-card overflow-hidden">
               <div className="px-4 sm:px-5 py-3.5 border-b border-slate-100">
                 <p className="text-sm font-semibold text-slate-900">Zona di lavoro</p>
                 <p className="text-xs text-slate-400 mt-0.5">Seleziona l&apos;ambiente in cui stai lavorando</p>
@@ -1854,7 +1951,7 @@ function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materi
             </div>
 
             {/* foto cantiere */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="app-card overflow-hidden">
               <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
                 <p className="text-sm font-semibold text-slate-900">Foto cantiere</p>
                 <span className={`text-[11px] font-semibold px-2 py-1 rounded-full ${fotoCantiere.length >= 2 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
@@ -1896,7 +1993,7 @@ function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materi
             </div>
 
             {/* materiali */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="app-card overflow-hidden">
               <div className="px-5 py-3.5 border-b border-slate-100">
                 <p className="text-sm font-semibold text-slate-900">Materiali grezzi</p>
 
@@ -1983,7 +2080,7 @@ function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materi
             </div>
 
             {/* catalogo */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="app-card overflow-hidden">
               <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
                 <p className="text-sm font-semibold text-slate-900">Catalogo prodotti</p>
                 <div className="flex gap-1 overflow-x-auto">
@@ -2024,7 +2121,7 @@ function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materi
           </div>
 
           {/* riepilogo sticky */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-5 lg:sticky lg:top-6">
+          <div className="app-card p-5 lg:sticky lg:top-6">
             <p className="text-sm font-semibold text-slate-900 mb-1">Riepilogo</p>
             <p className="text-xs text-slate-400 mb-4">{carrello.length} {carrello.length === 1 ? 'voce' : 'voci'} aggiunte</p>
 
@@ -2400,7 +2497,7 @@ function MaterialiPage({ materiali, setMateriali }) {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
 
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+      <div className="app-card overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
             <h2 className="text-sm font-semibold text-slate-900">Materiali grezzi</h2>
@@ -2614,7 +2711,7 @@ function CatalogoPage({ prodotti, setProdotti }) {
     <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
 
       {/* Aggiorna catalogo — import autonomo del listino fornitore */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center justify-between gap-4 flex-wrap">
+      <div className="app-card p-4 flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-start gap-3 min-w-0">
           <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
             <Download className="w-[18px] h-[18px] text-blue-600" />
@@ -2682,7 +2779,7 @@ function CatalogoPage({ prodotti, setProdotti }) {
       )}
 
       {showNewForm && (
-        <div className="bg-white border border-slate-200 rounded-2xl p-4">
+        <div className="app-card p-4">
           <p className="text-xs font-semibold text-slate-500 mb-3">Nuovo prodotto in "{activeCat}"</p>
           <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto_auto_auto] gap-2.5 items-end">
             <div>
@@ -2742,7 +2839,7 @@ function CatalogoPage({ prodotti, setProdotti }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filtered.map((p) => (
-          <div key={p.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden group">
+          <div key={p.id} className="app-card overflow-hidden group">
             <div className="h-28 bg-slate-50 flex flex-col items-center justify-center gap-1.5 relative">
               <ImagePlus className="w-5 h-5 text-slate-300" />
               <span className="text-[10.5px] font-medium text-slate-400">Foto da aggiungere</span>
@@ -2764,7 +2861,7 @@ function CatalogoPage({ prodotti, setProdotti }) {
           </div>
         ))}
         {filtered.length === 0 && (
-          <div className="sm:col-span-2 lg:col-span-3 bg-white border border-slate-200 rounded-2xl py-14 flex flex-col items-center justify-center text-center">
+          <div className="sm:col-span-2 lg:col-span-3 app-card py-14 flex flex-col items-center justify-center text-center">
             <ShoppingBag className="w-7 h-7 text-slate-300 mb-2" />
             <p className="text-sm text-slate-400">Nessun prodotto in questa categoria.</p>
           </div>
@@ -2785,7 +2882,7 @@ function SquadraPage({ preventivi, clienti }) {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
       {lavoriAttivi.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-2xl py-16 flex flex-col items-center justify-center text-center">
+        <div className="app-card py-16 flex flex-col items-center justify-center text-center">
           <Wrench className="w-7 h-7 text-slate-300 mb-2" />
           <p className="text-sm text-slate-400">Nessun lavoro attivo al momento.</p>
         </div>
@@ -2796,7 +2893,7 @@ function SquadraPage({ preventivi, clienti }) {
             const zone = p.zone || [];
             const carrelloSnap = p.carrelloSnapshot || [];
             return (
-              <div key={p.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+              <div key={p.id} className="app-card overflow-hidden">
                 <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{p.cantiere}</p>
@@ -2881,10 +2978,12 @@ function App() {
   const goToPage = (page) => {
     setCurrentPage(page);
     setMobileNavOpen(false);
+    const main = document.querySelector('main.app-scroll');
+    if (main) main.scrollTop = 0;
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="h-[100dvh] flex bg-[#eef1f5] lg:bg-slate-50 overflow-hidden">
       <Sidebar
         currentPage={currentPage}
         setCurrentPage={goToPage}
@@ -2893,9 +2992,11 @@ function App() {
         onMobileClose={() => setMobileNavOpen(false)}
       />
 
-      <div className="flex-1 min-w-0 pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
         <TopBar title={title} subtitle={subtitle} onMenuClick={() => setMobileNavOpen(true)} />
 
+        <main className="flex-1 overflow-y-auto app-scroll pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-0">
+          <div key={currentPage} className="app-page">
         {currentPage === 'dashboard' && (
           <DashboardPage preventivi={preventivi} clienti={clienti} onVediTutti={() => setCurrentPage('preventivi')} />
         )}
@@ -2923,6 +3024,8 @@ function App() {
         {currentPage === 'materiali' && <MaterialiPage materiali={materiali} setMateriali={setMateriali} />}
         {currentPage === 'catalogo' && <CatalogoPage prodotti={prodotti} setProdotti={setProdotti} />}
         {currentPage === 'squadra' && <SquadraPage preventivi={preventivi} clienti={clienti} />}
+          </div>
+        </main>
       </div>
 
       <MobileBottomNav currentPage={currentPage} setCurrentPage={goToPage} />
