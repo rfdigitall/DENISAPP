@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Ferari Impianti — Gestionale</title>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
@@ -15,6 +15,8 @@
   #errbox { display:none; padding:24px; font-family:monospace; font-size:13px; color:#b91c1c;
             background:#fef2f2; border:1px solid #fecaca; margin:24px; border-radius:8px;
             white-space:pre-wrap; }
+  .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  html { -webkit-tap-highlight-color: transparent; }
 </style>
 </head>
 <body>
@@ -217,6 +219,66 @@ const MoreHorizontal = makeIcon('MoreHorizontal', [
   ['circle', { cx: 12, cy: 12, r: 1 }],
   ['circle', { cx: 19, cy: 12, r: 1 }],
   ['circle', { cx: 5, cy: 12, r: 1 }]
+]);
+
+const Menu = makeIcon('Menu', [
+  ['path', { d: 'M4 6h16' }],
+  ['path', { d: 'M4 12h16' }],
+  ['path', { d: 'M4 18h16' }]
+]);
+
+const Bath = makeIcon('Bath', [
+  ['path', { d: 'M9 6 6.5 3.5a1.5 1.5 0 0 0-1-.5C4.683 3 4 3.683 4 4.5V17a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5' }],
+  ['path', { d: 'M10 16v2' }],
+  ['path', { d: 'M14 16v2' }],
+  ['path', { d: 'M4 12h16' }]
+]);
+
+const DoorOpen = makeIcon('DoorOpen', [
+  ['path', { d: 'M13 4h3a2 2 0 0 1 2 2v14' }],
+  ['path', { d: 'M2 20h3' }],
+  ['path', { d: 'M13 20h9' }],
+  ['path', { d: 'M10 12v.01' }],
+  ['path', { d: 'M13 4.562v16.157a1 1 0 0 1-1.242.97L5 20V5.562a2 2 0 0 1 1.515-1.94l4-1A2 2 0 0 1 13 4.561z' }]
+]);
+
+const ChefHat = makeIcon('ChefHat', [
+  ['path', { d: 'M6 13.87A4 4 0 0 1 7.41 6a5.11 5.11 0 0 1 1.05-1.54 5 5 0 0 1 7.08 0A5.11 5.11 0 0 1 16.59 6 4 4 0 0 1 18 13.87V21H6Z' }],
+  ['path', { d: 'M6 17h12' }]
+]);
+
+const BedDouble = makeIcon('BedDouble', [
+  ['path', { d: 'M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8' }],
+  ['path', { d: 'M4 10V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4' }],
+  ['path', { d: 'M12 4v6' }],
+  ['path', { d: 'M2 18h20' }]
+]);
+
+const Sofa = makeIcon('Sofa', [
+  ['path', { d: 'M20 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v3' }],
+  ['path', { d: 'M2 11v5a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a2 2 0 0 0-4 0v2H6v-2a2 2 0 0 0-4 0Z' }],
+  ['path', { d: 'M4 18v2' }],
+  ['path', { d: 'M20 18v2' }],
+  ['path', { d: 'M12 4v9' }]
+]);
+
+const MoveHorizontal = makeIcon('MoveHorizontal', [
+  ['path', { d: 'm18 8 4 4-4 4' }],
+  ['path', { d: 'M2 12h20' }],
+  ['path', { d: 'm6 16-4-4 4-4' }]
+]);
+
+const TreePine = makeIcon('TreePine', [
+  ['path', { d: 'm17 14 3 3.3a1 1 0 0 1-.7 1.7H4.7a1 1 0 0 1-.7-1.7L7 14h-.3a1 1 0 0 1-.7-1.7L9 9h-.2A1 1 0 0 1 8 7.3L12 3l4 4.3a1 1 0 0 1-.8 1.7H15l3 3.3a1 1 0 0 1-.7 1.7H17Z' }],
+  ['path', { d: 'M12 22v-3' }]
+]);
+
+const Flame = makeIcon('Flame', [
+  ['path', { d: 'M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z' }]
+]);
+
+const Zap = makeIcon('Zap', [
+  ['path', { d: 'M13 2 3 14h8l-1 8 10-12h-8l1-8z' }]
 ]);
 
 
@@ -542,16 +604,23 @@ const categorieCatalogo = ['Caldaie & Clima', 'Sanitari', 'Box Doccia', 'Placche
 
 /* Zone/ambienti disponibili nel preventivo — richiesto dal cliente */
 const ZONE_AMBIENTI = [
-  { id: 'bagno', nome: 'Bagno', icon: '🚿' },
-  { id: 'antibagno', nome: 'Antibagno', icon: '🚪' },
-  { id: 'cucina', nome: 'Cucina', icon: '🍳' },
-  { id: 'camera', nome: 'Camera da letto', icon: '🛏️' },
-  { id: 'soggiorno', nome: 'Soggiorno', icon: '🛋️' },
-  { id: 'corridoio', nome: 'Corridoio', icon: '🚶' },
-  { id: 'esterno', nome: 'Esterno / Giardino', icon: '🌳' },
-  { id: 'centrale', nome: 'Centrale Termica', icon: '🔥' },
-  { id: 'generico', nome: 'Impianto Generico', icon: '⚡' },
+  { id: 'bagno', nome: 'Bagno', Icon: Bath },
+  { id: 'antibagno', nome: 'Antibagno', Icon: DoorOpen },
+  { id: 'cucina', nome: 'Cucina', Icon: ChefHat },
+  { id: 'camera', nome: 'Camera da letto', Icon: BedDouble },
+  { id: 'soggiorno', nome: 'Soggiorno', Icon: Sofa },
+  { id: 'corridoio', nome: 'Corridoio', Icon: MoveHorizontal },
+  { id: 'esterno', nome: 'Esterno / Giardino', Icon: TreePine },
+  { id: 'centrale', nome: 'Centrale Termica', Icon: Flame },
+  { id: 'generico', nome: 'Impianto Generico', Icon: Zap },
 ];
+
+function ZonaIcon({ zonaId, className, size }) {
+  const zona = ZONE_AMBIENTI.find(function (z) { return z.id === zonaId; });
+  if (!zona) return null;
+  const Icon = zona.Icon;
+  return React.createElement(Icon, { className: className || '', size: size || 16 });
+}
 
 /* Template lavori preimpostati — aprendo il template si aggiungono
    automaticamente le voci tipiche, poi l'utente aggiusta */
@@ -692,7 +761,7 @@ function LoginPage({ onLogin }) {
 /* SIDEBAR                                                        */
 /* ============================================================ */
 
-function Sidebar({ currentPage, setCurrentPage, onLogout }) {
+function Sidebar({ currentPage, setCurrentPage, onLogout, mobileOpen, onMobileClose }) {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'preventivi', label: 'Preventivi', icon: FileText },
@@ -701,75 +770,89 @@ function Sidebar({ currentPage, setCurrentPage, onLogout }) {
     { id: 'catalogo', label: 'Catalogo Prodotti', icon: ShoppingBag },
   ];
 
-  return (
-    <aside className="w-64 bg-white border-r border-slate-200 flex flex-col h-screen sticky top-0 shrink-0">
-      <div className="px-5 py-5 border-b border-slate-100">
-        <div className="flex items-center gap-2.5">
-          <img src={LOGO_BASE64} alt="Ferari Impianti" className="w-9 h-9 rounded-lg shrink-0" />
-          <div className="leading-tight">
-            <p className="text-sm font-semibold text-slate-900">Ferari Impianti</p>
-            <p className="text-[11px] text-slate-400">Gestionale</p>
-          </div>
-        </div>
-      </div>
+  const goTo = (id) => {
+    setCurrentPage(id);
+    if (onMobileClose) onMobileClose();
+  };
 
-      <nav className="flex-1 px-3 py-4 space-y-0.5">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = currentPage === item.id;
-          return (
+  return (
+    <>
+      {mobileOpen && (
+        <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={onMobileClose} aria-hidden="true" />
+      )}
+      <aside className={`fixed lg:sticky top-0 z-50 lg:z-auto w-[min(18rem,88vw)] lg:w-64 bg-white border-r border-slate-200 flex flex-col h-[100dvh] shrink-0 transition-transform duration-200 ease-out ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+        <div className="px-5 py-5 border-b border-slate-100 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <img src={LOGO_BASE64} alt="Ferari Impianti" className="w-9 h-9 rounded-lg shrink-0" />
+            <div className="leading-tight min-w-0">
+              <p className="text-sm font-semibold text-slate-900 truncate">Ferari Impianti</p>
+              <p className="text-[11px] text-slate-400">Gestionale</p>
+            </div>
+          </div>
+          <button type="button" onClick={onMobileClose} className="lg:hidden w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50" aria-label="Chiudi menu">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = currentPage === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => goTo(item.id)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+              >
+                <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
+                {item.label}
+              </button>
+            );
+          })}
+
+          <div className="pt-3 mt-3 border-t border-slate-100">
+            <p className="px-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Vista squadra</p>
             <button
-              key={item.id}
-              onClick={() => setCurrentPage(item.id)}
+              type="button"
+              onClick={() => goTo('squadra')}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive
+                currentPage === 'squadra'
                   ? 'bg-blue-50 text-blue-700'
                   : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
               }`}
             >
-              <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
-              {item.label}
+              <Wrench className={`w-[18px] h-[18px] ${currentPage === 'squadra' ? 'text-blue-600' : 'text-slate-400'}`} />
+              Lavori Squadra
             </button>
-          );
-        })}
+          </div>
+        </nav>
 
-        {/* Vista Squadra — non è un login separato, l'amministratore vede da qui cosa
-            vedrebbe la squadra: solo lavorazioni e materiali, zero prezzi */}
-        <div className="pt-3 mt-3 border-t border-slate-100">
-          <p className="px-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Vista squadra</p>
+        <div className="px-3 py-4 border-t border-slate-100">
+          <div className="flex items-center gap-2.5 px-3 py-2">
+            <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-semibold text-slate-600 shrink-0">
+              D
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-slate-900 truncate">Denis</p>
+              <p className="text-[11px] text-slate-400 truncate">Amministratore</p>
+            </div>
+          </div>
           <button
-            onClick={() => setCurrentPage('squadra')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              currentPage === 'squadra'
-                ? 'bg-blue-50 text-blue-700'
-                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-            }`}
+            type="button"
+            onClick={onLogout}
+            className="w-full flex items-center gap-3 px-3 py-2.5 mt-1 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-red-600 transition-colors"
           >
-            <Wrench className={`w-[18px] h-[18px] ${currentPage === 'squadra' ? 'text-blue-600' : 'text-slate-400'}`} />
-            Lavori Squadra
+            <LogOut className="w-[18px] h-[18px]" />
+            Esci
           </button>
         </div>
-      </nav>
-
-      <div className="px-3 py-4 border-t border-slate-100">
-        <div className="flex items-center gap-2.5 px-3 py-2">
-          <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-semibold text-slate-600 shrink-0">
-            D
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold text-slate-900 truncate">Denis</p>
-            <p className="text-[11px] text-slate-400 truncate">Amministratore</p>
-          </div>
-        </div>
-        <button
-          onClick={onLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 mt-1 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-red-600 transition-colors"
-        >
-          <LogOut className="w-[18px] h-[18px]" />
-          Esci
-        </button>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }
 
@@ -777,28 +860,64 @@ function Sidebar({ currentPage, setCurrentPage, onLogout }) {
 /* TOP BAR                                                        */
 /* ============================================================ */
 
-function TopBar({ title, subtitle }) {
+function TopBar({ title, subtitle, onMenuClick }) {
   return (
-    <header className="bg-white border-b border-slate-200 px-8 py-5 flex items-center justify-between">
-      <div>
-        <h1 className="text-xl font-semibold text-slate-900 tracking-tight">{title}</h1>
-        {subtitle && <p className="text-sm text-slate-500 mt-0.5">{subtitle}</p>}
+    <header className="bg-white border-b border-slate-200 px-4 sm:px-6 lg:px-8 py-4 lg:py-5 flex items-center justify-between gap-3 sticky top-0 z-30">
+      <div className="flex items-center gap-3 min-w-0">
+        <button type="button" onClick={onMenuClick} className="lg:hidden w-9 h-9 rounded-lg border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-50 shrink-0" aria-label="Apri menu">
+          <Menu className="w-[18px] h-[18px]" />
+        </button>
+        <div className="min-w-0">
+          <h1 className="text-lg sm:text-xl font-semibold text-slate-900 tracking-tight truncate">{title}</h1>
+          {subtitle && <p className="text-sm text-slate-500 mt-0.5 truncate">{subtitle}</p>}
+        </div>
       </div>
-      <div className="flex items-center gap-3">
-        <div className="relative hidden sm:block">
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        <div className="relative hidden md:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
             placeholder="Cerca..."
-            className="pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 w-56 transition-colors"
+            className="pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 w-44 lg:w-56 transition-colors"
           />
         </div>
-        <button className="relative w-9 h-9 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors">
+        <button type="button" className="relative w-9 h-9 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors">
           <Bell className="w-4 h-4" />
           <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
         </button>
       </div>
     </header>
+  );
+}
+
+function MobileBottomNav({ currentPage, setCurrentPage }) {
+  const items = [
+    { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
+    { id: 'preventivi', label: 'Preventivi', icon: FileText },
+    { id: 'clienti', label: 'Clienti', icon: Users },
+    { id: 'catalogo', label: 'Catalogo', icon: ShoppingBag },
+  ];
+
+  return (
+    <nav className="fixed bottom-0 inset-x-0 z-40 lg:hidden bg-white/95 backdrop-blur border-t border-slate-200 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+      <div className="grid grid-cols-4">
+        {items.map(function (item) {
+          const Icon = item.icon;
+          const isActive = currentPage === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setCurrentPage(item.id)}
+              className={`flex flex-col items-center justify-center gap-0.5 py-2.5 px-1 text-[10px] font-semibold transition-colors ${isActive ? 'text-blue-700' : 'text-slate-500'}`}
+            >
+              <Icon className={`w-5 h-5 ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
 
@@ -930,7 +1049,7 @@ function PreventiviTable({ preventivi, onVediTutti }) {
 
 function DashboardPage({ preventivi, clienti, onVediTutti }) {
   return (
-    <div className="px-8 py-6 space-y-6">
+    <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6">
       <DashboardCards preventivi={preventivi} clienti={clienti} />
       <PreventiviTable preventivi={preventivi} onVediTutti={onVediTutti} />
     </div>
@@ -991,7 +1110,7 @@ function ClientiPage({ clienti, setClienti, preventivi, onNuovoPreventivo }) {
   /* ---- vista dettaglio cliente ---- */
   if (selected) {
     return (
-      <div className="px-8 py-6 space-y-5 max-w-3xl">
+      <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5 max-w-3xl">
         <button
           onClick={() => setSelectedId(null)}
           className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900"
@@ -1099,7 +1218,7 @@ function ClientiPage({ clienti, setClienti, preventivi, onNuovoPreventivo }) {
 
   /* ---- vista lista clienti ---- */
   return (
-    <div className="px-8 py-6 space-y-5">
+    <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[220px] max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -1460,7 +1579,7 @@ function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materi
   /* ---- vista lista ---- */
   if (mode === 'lista') {
     return (
-      <div className="px-8 py-6 space-y-5">
+      <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
         <div className="flex items-center justify-end">
           <button
             onClick={startNuovo}
@@ -1545,7 +1664,7 @@ function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materi
       : 0;
     if (!p) { setMode('lista'); return null; }
     return (
-      <div className="px-8 py-6 space-y-5 max-w-3xl">
+      <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5 max-w-3xl">
         <button onClick={() => setMode('lista')} className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900">
           <ArrowLeft className="w-3.5 h-3.5" />
           Torna ai preventivi
@@ -1574,8 +1693,9 @@ function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materi
                 const vociZona = carrelloDett.filter(i => (i.zona || 'generico') === zonaId);
                 return (
                   <div key={zonaId}>
-                    <p className="text-sm font-bold text-slate-800 flex items-center gap-1.5 mb-1.5">
-                      <span>{zonaInfo?.icon}</span>{zonaInfo?.nome || zonaId}
+                    <p className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-1.5">
+                      <ZonaIcon zonaId={zonaInfo?.id || zonaId} className="text-slate-500 shrink-0" size={16} />
+                      {zonaInfo?.nome || zonaId}
                     </p>
                     <ul className="space-y-1">
                       {vociZona.map(v => (
@@ -1603,7 +1723,7 @@ function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materi
           </div>
         )}
 
-        <div className="flex gap-2.5">
+        <div className="flex flex-col sm:flex-row gap-2.5">
           <button
             onClick={async () => {
               if (!clienteDett) return;
@@ -1633,7 +1753,7 @@ function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materi
 
   /* ---- vista creazione nuovo preventivo ---- */
   return (
-    <div className="px-8 py-6 pb-28">
+    <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 pb-4">
       <button onClick={() => setMode('lista')} className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 mb-5">
         <ArrowLeft className="w-3.5 h-3.5" />
         Torna ai preventivi
@@ -1683,36 +1803,48 @@ function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materi
 
             {/* zona / ambiente attivo */}
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-              <div className="px-5 py-3.5 border-b border-slate-100">
+              <div className="px-4 sm:px-5 py-3.5 border-b border-slate-100">
                 <p className="text-sm font-semibold text-slate-900">Zona di lavoro</p>
+                <p className="text-xs text-slate-400 mt-0.5">Seleziona l&apos;ambiente in cui stai lavorando</p>
               </div>
-              <div className="p-4 flex flex-wrap gap-2">
-                {ZONE_AMBIENTI.map(z => (
-                  <button
-                    key={z.id}
-                    onClick={() => setZonaAttiva(z.id)}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
-                      zonaAttiva === z.id
-                        ? 'bg-slate-900 text-white'
-                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <span>{z.icon}</span>{z.nome}
-                  </button>
-                ))}
+              <div className="p-3 sm:p-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5">
+                  {ZONE_AMBIENTI.map(function (z) {
+                    const Icon = z.Icon;
+                    const active = zonaAttiva === z.id;
+                    return (
+                      <button
+                        key={z.id}
+                        type="button"
+                        onClick={() => setZonaAttiva(z.id)}
+                        className={`flex flex-col items-start gap-2.5 p-3 rounded-xl border text-left transition-all min-h-[88px] ${
+                          active
+                            ? 'border-slate-900 bg-slate-900 text-white shadow-sm ring-1 ring-slate-900/10'
+                            : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 active:scale-[0.98]'
+                        }`}
+                      >
+                        <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${active ? 'bg-white/15' : 'bg-slate-100'}`}>
+                          <Icon className={`w-4 h-4 ${active ? 'text-white' : 'text-slate-600'}`} />
+                        </span>
+                        <span className="text-[11px] sm:text-xs font-semibold leading-snug pr-1">{z.nome}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              {/* template lavori per la zona selezionata */}
               {TEMPLATE_LAVORI.filter(t => t.zona === zonaAttiva).length > 0 && (
-                <div className="px-4 pb-4">
-                  <div className="flex flex-wrap gap-2">
+                <div className="px-3 sm:px-4 pb-4 border-t border-slate-100 pt-3">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-2.5">Template rapidi</p>
+                  <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
                     {TEMPLATE_LAVORI.filter(t => t.zona === zonaAttiva).map(t => (
                       <button
                         key={t.id}
+                        type="button"
                         onClick={() => applicaTemplate(t)}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                        className="flex items-center justify-center sm:justify-start gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-100 transition-colors w-full sm:w-auto"
                       >
-                        <Plus className="w-3.5 h-3.5" />
+                        <Plus className="w-3.5 h-3.5 shrink-0" />
                         {t.nome}
                       </button>
                     ))}
@@ -1743,7 +1875,7 @@ function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materi
                   </label>
                 </div>
                 {fotoCantiere.length > 0 && (
-                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
                     {fotoCantiere.map(f => (
                       <div key={f.id} className="relative group aspect-square rounded-lg overflow-hidden border border-slate-200">
                         <img src={f.dataUrl} alt="" className="w-full h-full object-cover" />
@@ -1773,12 +1905,12 @@ function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materi
                 {materiali.map(m => {
                   const inCarrello = carrello.find(i => i.id === m.id);
                   return (
-                    <div key={m.id} className="px-5 py-3 flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">{m.nome}</p>
+                    <div key={m.id} className="px-4 sm:px-5 py-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-slate-900">{m.nome}</p>
                         <p className="text-xs text-slate-400">{m.unita === 'm' ? 'al metro' : 'a pezzo'}</p>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
                         <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-1">
                           <button onClick={() => aggiornaQtyMateriale(m.id, Math.max(1, (inCarrello?.qty || 1) - 1))} className="text-slate-400 w-5 text-center font-bold">−</button>
                           <span className="w-6 text-center text-xs font-mono text-slate-700">{inCarrello?.qty || 0}</span>
@@ -1907,7 +2039,7 @@ function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materi
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
                       <p className="text-xs font-medium text-slate-900 truncate">{item.nome}</p>
-                      {zonaInfo && <span className="text-[9px] shrink-0" title={zonaInfo.nome}>{zonaInfo.icon}</span>}
+                      {zonaInfo && <ZonaIcon zonaId={zonaInfo.id} className="text-slate-400 shrink-0" size={12} />}
                     </div>
                     <p className="text-[10px] text-slate-400 truncate">{item.meta}</p>
                   </div>
@@ -2061,8 +2193,9 @@ function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materi
                       const prod = vociZona.filter(i => i.kind === 'prodotto');
                       return (
                         <div key={zona.id}>
-                          <p className="text-[12.5px] font-bold text-slate-900 uppercase flex items-center gap-1.5">
-                            <span>{zona.icon}</span>{zona.nome}
+                          <p className="text-[12.5px] font-bold text-slate-900 uppercase flex items-center gap-2">
+                            <ZonaIcon zonaId={zona.id} className="text-slate-600 shrink-0" size={14} />
+                            {zona.nome}
                           </p>
                           <ul className="mt-1.5 space-y-1">
                             {mat.map(item => (
@@ -2265,7 +2398,7 @@ function MaterialiPage({ materiali, setMateriali }) {
   };
 
   return (
-    <div className="px-8 py-6 space-y-5">
+    <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
 
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -2478,7 +2611,7 @@ function CatalogoPage({ prodotti, setProdotti }) {
   };
 
   return (
-    <div className="px-8 py-6 space-y-5">
+    <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
 
       {/* Aggiorna catalogo — import autonomo del listino fornitore */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center justify-between gap-4 flex-wrap">
@@ -2650,7 +2783,7 @@ function SquadraPage({ preventivi, clienti }) {
   const lavoriAttivi = preventivi.filter(p => p.stato === 'In Attesa' || p.stato === 'Accettato');
 
   return (
-    <div className="px-8 py-6 space-y-5">
+    <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
       {lavoriAttivi.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-2xl py-16 flex flex-col items-center justify-center text-center">
           <Wrench className="w-7 h-7 text-slate-300 mb-2" />
@@ -2678,8 +2811,9 @@ function SquadraPage({ preventivi, clienti }) {
                       const vociZona = carrelloSnap.filter(i => (i.zona || 'generico') === zonaId);
                       return (
                         <div key={zonaId}>
-                          <p className="text-xs font-bold text-slate-700 flex items-center gap-1.5 mb-1">
-                            <span>{zonaInfo?.icon}</span>{zonaInfo?.nome || zonaId}
+                          <p className="text-xs font-bold text-slate-700 flex items-center gap-2 mb-1">
+                            <ZonaIcon zonaId={zonaInfo?.id || zonaId} className="text-slate-500 shrink-0" size={14} />
+                            {zonaInfo?.nome || zonaId}
                           </p>
                           <ul className="space-y-0.5 pl-1">
                             {vociZona.map(v => (
@@ -2724,6 +2858,7 @@ const pageConfig = {
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentPage, setCurrentPage] = useState('dashboard');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   // stato centrale: tutta l'app legge e scrive da qui
   const [clienti, setClienti] = useState(clientiIniziali);
@@ -2743,16 +2878,23 @@ function App() {
     setCurrentPage('preventivi');
   };
 
+  const goToPage = (page) => {
+    setCurrentPage(page);
+    setMobileNavOpen(false);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex">
       <Sidebar
         currentPage={currentPage}
-        setCurrentPage={setCurrentPage}
+        setCurrentPage={goToPage}
         onLogout={() => setIsLoggedIn(false)}
+        mobileOpen={mobileNavOpen}
+        onMobileClose={() => setMobileNavOpen(false)}
       />
 
-      <div className="flex-1 min-w-0">
-        <TopBar title={title} subtitle={subtitle} />
+      <div className="flex-1 min-w-0 pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0">
+        <TopBar title={title} subtitle={subtitle} onMenuClick={() => setMobileNavOpen(true)} />
 
         {currentPage === 'dashboard' && (
           <DashboardPage preventivi={preventivi} clienti={clienti} onVediTutti={() => setCurrentPage('preventivi')} />
@@ -2782,6 +2924,8 @@ function App() {
         {currentPage === 'catalogo' && <CatalogoPage prodotti={prodotti} setProdotti={setProdotti} />}
         {currentPage === 'squadra' && <SquadraPage preventivi={preventivi} clienti={clienti} />}
       </div>
+
+      <MobileBottomNav currentPage={currentPage} setCurrentPage={goToPage} />
     </div>
   );
 }
