@@ -1,0 +1,2794 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ferari Impianti — Gestionale</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  #errbox { display:none; padding:24px; font-family:monospace; font-size:13px; color:#b91c1c;
+            background:#fef2f2; border:1px solid #fecaca; margin:24px; border-radius:8px;
+            white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="errbox"></div>
+
+<script>
+// Se qualcosa va storto, mostra l'errore invece della pagina bianca.
+window.addEventListener('error', function (e) {
+  var b = document.getElementById('errbox');
+  if (b) { b.style.display = 'block'; b.textContent = 'Errore: ' + (e.message || e); }
+});
+</script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useCallback, useRef } = React;
+
+/* ============================================================
+   ICONE SVG INLINE — sostituiscono lucide-react.
+   Nessuna dipendenza esterna: cos� la pagina non pu� rompersi
+   se un CDN non risponde o cambia il nome della variabile globale.
+   ============================================================ */
+function makeIcon(name, children) {
+  const Icon = function (props) {
+    const { className, size, strokeWidth, style, title, ...rest } = props || {};
+    return React.createElement(
+      'svg',
+      Object.assign(
+        {
+          xmlns: 'http://www.w3.org/2000/svg',
+          width: size || 24,
+          height: size || 24,
+          viewBox: '0 0 24 24',
+          fill: 'none',
+          stroke: 'currentColor',
+          strokeWidth: strokeWidth || 2,
+          strokeLinecap: 'round',
+          strokeLinejoin: 'round',
+          className: className || '',
+          style: style,
+          'aria-hidden': 'true'
+        },
+        rest
+      ),
+      children.map(function (c, i) {
+        return React.createElement(c[0], Object.assign({ key: i }, c[1]));
+      })
+    );
+  };
+  Icon.displayName = name;
+  return Icon;
+}
+
+const LayoutDashboard = makeIcon('LayoutDashboard', [
+  ['rect', { x: 3, y: 3, width: 7, height: 9, rx: 1 }],
+  ['rect', { x: 14, y: 3, width: 7, height: 5, rx: 1 }],
+  ['rect', { x: 14, y: 12, width: 7, height: 9, rx: 1 }],
+  ['rect', { x: 3, y: 16, width: 7, height: 5, rx: 1 }]
+]);
+
+const FileText = makeIcon('FileText', [
+  ['path', { d: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z' }],
+  ['path', { d: 'M14 2v5h5' }],
+  ['path', { d: 'M8 13h8' }],
+  ['path', { d: 'M8 17h5' }]
+]);
+
+const Users = makeIcon('Users', [
+  ['path', { d: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2' }],
+  ['circle', { cx: 9, cy: 7, r: 4 }],
+  ['path', { d: 'M22 21v-2a4 4 0 0 0-3-3.87' }],
+  ['path', { d: 'M16 3.13a4 4 0 0 1 0 7.75' }]
+]);
+
+const Package = makeIcon('Package', [
+  ['path', { d: 'M21 8v8a2 2 0 0 1-1 1.73l-7 4a2 2 0 0 1-2 0l-7-4A2 2 0 0 1 3 16V8a2 2 0 0 1 1-1.73l7-4a2 2 0 0 1 2 0l7 4A2 2 0 0 1 21 8z' }],
+  ['path', { d: 'M3.3 7 12 12l8.7-5' }],
+  ['path', { d: 'M12 22V12' }]
+]);
+
+const ShoppingBag = makeIcon('ShoppingBag', [
+  ['path', { d: 'M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z' }],
+  ['path', { d: 'M3 6h18' }],
+  ['path', { d: 'M16 10a4 4 0 0 1-8 0' }]
+]);
+
+const LogOut = makeIcon('LogOut', [
+  ['path', { d: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4' }],
+  ['path', { d: 'm16 17 5-5-5-5' }],
+  ['path', { d: 'M21 12H9' }]
+]);
+
+const Search = makeIcon('Search', [
+  ['circle', { cx: 11, cy: 11, r: 8 }],
+  ['path', { d: 'm21 21-4.3-4.3' }]
+]);
+
+const Bell = makeIcon('Bell', [
+  ['path', { d: 'M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9' }],
+  ['path', { d: 'M10.3 21a1.94 1.94 0 0 0 3.4 0' }]
+]);
+
+const ChevronRight = makeIcon('ChevronRight', [['path', { d: 'm9 18 6-6-6-6' }]]);
+
+const Clock = makeIcon('Clock', [
+  ['circle', { cx: 12, cy: 12, r: 10 }],
+  ['path', { d: 'M12 6v6l4 2' }]
+]);
+
+const Euro = makeIcon('Euro', [
+  ['path', { d: 'M4 10h12' }],
+  ['path', { d: 'M4 14h9' }],
+  ['path', { d: 'M19 6.6A6.6 6.6 0 0 0 14.5 5a7 7 0 0 0 0 14 6.6 6.6 0 0 0 4.5-1.6' }]
+]);
+
+const Mail = makeIcon('Mail', [
+  ['rect', { x: 2, y: 4, width: 20, height: 16, rx: 2 }],
+  ['path', { d: 'm22 7-10 6L2 7' }]
+]);
+
+const Lock = makeIcon('Lock', [
+  ['rect', { x: 3, y: 11, width: 18, height: 11, rx: 2 }],
+  ['path', { d: 'M7 11V7a5 5 0 0 1 10 0v4' }]
+]);
+
+const Eye = makeIcon('Eye', [
+  ['path', { d: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z' }],
+  ['circle', { cx: 12, cy: 12, r: 3 }]
+]);
+
+const EyeOff = makeIcon('EyeOff', [
+  ['path', { d: 'M9.9 4.2A10.9 10.9 0 0 1 12 4c6.5 0 10 7 10 7a18 18 0 0 1-2.6 3.7' }],
+  ['path', { d: 'M6.6 6.6A18 18 0 0 0 2 11s3.5 7 10 7a10.9 10.9 0 0 0 4.4-.9' }],
+  ['path', { d: 'M9.9 9.9a3 3 0 0 0 4.2 4.2' }],
+  ['path', { d: 'm2 2 20 20' }]
+]);
+
+const Plus = makeIcon('Plus', [
+  ['path', { d: 'M12 5v14' }],
+  ['path', { d: 'M5 12h14' }]
+]);
+
+const Pencil = makeIcon('Pencil', [
+  ['path', { d: 'M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z' }],
+  ['path', { d: 'm15 5 4 4' }]
+]);
+
+const Trash2 = makeIcon('Trash2', [
+  ['path', { d: 'M3 6h18' }],
+  ['path', { d: 'M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6' }],
+  ['path', { d: 'M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2' }],
+  ['path', { d: 'M10 11v6' }],
+  ['path', { d: 'M14 11v6' }]
+]);
+
+const X = makeIcon('X', [
+  ['path', { d: 'M18 6 6 18' }],
+  ['path', { d: 'm6 6 12 12' }]
+]);
+
+const Check = makeIcon('Check', [['path', { d: 'M20 6 9 17l-5-5' }]]);
+
+const ImagePlus = makeIcon('ImagePlus', [
+  ['path', { d: 'M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7' }],
+  ['path', { d: 'M16 5h6' }],
+  ['path', { d: 'M19 2v6' }],
+  ['circle', { cx: 9, cy: 9, r: 2 }],
+  ['path', { d: 'm21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21' }]
+]);
+
+const Wrench = makeIcon('Wrench', [
+  ['path', { d: 'M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z' }]
+]);
+
+const Phone = makeIcon('Phone', [
+  ['path', { d: 'M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.9.7 2.8a2 2 0 0 1-.4 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.9.6 2.8.7a2 2 0 0 1 1.7 2z' }]
+]);
+
+const MessageCircle = makeIcon('MessageCircle', [
+  ['path', { d: 'M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z' }]
+]);
+
+const ArrowLeft = makeIcon('ArrowLeft', [
+  ['path', { d: 'm12 19-7-7 7-7' }],
+  ['path', { d: 'M19 12H5' }]
+]);
+
+const Download = makeIcon('Download', [
+  ['path', { d: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }],
+  ['path', { d: 'm7 10 5 5 5-5' }],
+  ['path', { d: 'M12 15V3' }]
+]);
+
+const TrendingUp = makeIcon('TrendingUp', [
+  ['path', { d: 'm22 7-8.5 8.5-5-5L2 17' }],
+  ['path', { d: 'M16 7h6v6' }]
+]);
+
+const MoreHorizontal = makeIcon('MoreHorizontal', [
+  ['circle', { cx: 12, cy: 12, r: 1 }],
+  ['circle', { cx: 19, cy: 12, r: 1 }],
+  ['circle', { cx: 5, cy: 12, r: 1 }]
+]);
+
+
+const LOGO_BASE64 = 'data:image/png;base64,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';
+
+/* ============================================================ */
+/* DATI DI ESEMPIO                                               */
+/* ============================================================ */
+
+const clientiIniziali = [
+  { id: 'c1', nome: 'Mario Rossi', indirizzo: 'Via Roma 12, Bologna', telefono: '+39 333 1234567', note: [] },
+  { id: 'c2', nome: 'Giulia Bianchi', indirizzo: 'Via Garibaldi 45, Modena', telefono: '+39 339 7654321', note: [] },
+  { id: 'c3', nome: 'Stefano Magnani', indirizzo: 'Corso Italia 8, Reggio Emilia', telefono: '+39 347 9988776', note: [] },
+  { id: 'c4', nome: 'Anna Ferrari', indirizzo: 'Via Emilia 200, Bologna', telefono: '+39 320 4455667', note: [] },
+  { id: 'c5', nome: 'Paola Greco', indirizzo: 'Piazza Maggiore 5, Bologna', telefono: '+39 348 1122334', note: [] },
+  { id: 'c6', nome: 'Elena Ricci', indirizzo: 'Via Saragozza 91, Bologna', telefono: '+39 333 6677889', note: [] },
+  { id: 'c7', nome: 'Roberto Galli', indirizzo: 'Via Po 14, Cesena', telefono: '+39 320 1133557', note: [] },
+];
+
+const preventiviRecenti = [
+  { id: 'PV-0148', clienteId: 'c1', cliente: 'Mario Rossi', cantiere: 'Bologna', data: '12 giu 2026', importo: 2840, stato: 'Inviato' },
+  { id: 'PV-0147', clienteId: 'c2', cliente: 'Giulia Bianchi', cantiere: 'Modena', data: '08 giu 2026', importo: 1610, stato: 'Accettato' },
+  { id: 'PV-0146', clienteId: 'c4', cliente: 'Anna Ferrari', cantiere: 'Bologna', data: '02 giu 2026', importo: 180, stato: 'Accettato' },
+  { id: 'PV-0145', clienteId: 'c5', cliente: 'Paola Greco', cantiere: 'Bologna', data: '29 mag 2026', importo: 740, stato: 'In Attesa' },
+  { id: 'PV-0144', clienteId: 'c6', cliente: 'Elena Ricci', cantiere: 'Bologna', data: '15 mag 2026', importo: 1120, stato: 'Inviato' },
+  { id: 'PV-0143', clienteId: 'c7', cliente: 'Roberto Galli', cantiere: 'Cesena', data: '07 mar 2026', importo: 420, stato: 'In Attesa' },
+];
+
+const statoStyle = {
+  'Accettato': 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/20',
+  'Inviato':   'bg-blue-50 text-blue-700 ring-1 ring-blue-600/20',
+  'In Attesa': 'bg-amber-50 text-amber-700 ring-1 ring-amber-600/20',
+  'Rifiutato': 'bg-red-50 text-red-600 ring-1 ring-red-400/30',
+};
+
+const fmtEuro = (n) => n.toLocaleString('it-IT', { minimumFractionDigits: 0 }) + ' €';
+const fmtEuro2 = (n) => n.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+const oggiData = () => new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' });
+const oggiStr  = () => new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'short', year:'numeric' });
+
+/* ============================================================ */
+/* GENERAZIONE PDF — jsPDF caricato dinamicamente               */
+/* ============================================================ */
+
+function loadJsPDF() {
+  return new Promise((resolve, reject) => {
+    if (window.jspdf) { resolve(window.jspdf.jsPDF); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.onload = () => resolve(window.jspdf.jsPDF);
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+const NAVY = [16, 19, 58];
+const WHITE = [255, 255, 255];
+const SLATE9 = [22, 25, 28];
+const SLATE5 = [107, 113, 120];
+const SLATE3 = [199, 203, 209];
+const EMERALD = [21, 146, 89];
+const AMBER = [201, 133, 58];
+
+function addHeaderCliente(doc, logoB64, nextId) {
+  // banner navy curvo (rettangolo + ellisse per effetto curvo)
+  doc.setFillColor(...NAVY);
+  doc.rect(0, 0, 210, 40, 'F');
+  doc.setFillColor(...NAVY);
+  doc.ellipse(105, 38, 130, 14, 'F');
+
+  // logo
+  try { doc.addImage(logoB64, 'PNG', 12, 6, 24, 24, '', 'FAST'); } catch(e) {}
+
+  // titolo PREVENTIVO
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(...WHITE);
+  doc.text('PREVENTIVO', 42, 22);
+
+  // riquadro data/numero
+  doc.setFillColor(...WHITE);
+  doc.roundedRect(12, 46, 186, 18, 3, 3, 'F');
+  doc.setDrawColor(...SLATE3);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(12, 46, 186, 18, 3, 3, 'S');
+
+  doc.setTextColor(...SLATE5);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.text('DATA PREVENTIVO', 20, 52);
+  doc.text('NUMERO', 120, 52);
+
+  doc.setTextColor(...SLATE9);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text(oggiData(), 20, 59);
+  doc.text(nextId, 120, 59);
+}
+
+function addFooterCliente(doc) {
+  const pgH = doc.internal.pageSize.getHeight();
+  doc.setFontSize(7);
+  doc.setTextColor(...SLATE5);
+  doc.setFont('helvetica', 'italic');
+  doc.text(
+    'Preventivo valido per 10 giorni dalla data di emissione, a causa di variazioni dei costi del materiale.',
+    105, pgH - 8, { align:'center' }
+  );
+  doc.text('PAGINA 1 DI 1', 105, pgH - 4, { align:'center' });
+}
+
+async function generaPDFCliente({ cliente, carrello, rincaro, totale, nextId, logoB64 }) {
+  const jsPDF = await loadJsPDF();
+  const doc = new jsPDF({ unit:'mm', format:'a4', orientation:'portrait' });
+
+  addHeaderCliente(doc, logoB64, nextId);
+
+  let y = 74;
+
+  // anteprima cliente
+  doc.setFillColor(243, 244, 246);
+  doc.roundedRect(12, y, 186, 20, 2, 2, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...SLATE5);
+  doc.text('CLIENTE', 20, y+5);
+  doc.text('CANTIERE', 110, y+5);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...SLATE9);
+  doc.text(cliente.nome, 20, y+13);
+  doc.text(cliente.indirizzo, 110, y+13);
+  y += 26;
+
+  // sezione DISEGNAZIONE LAVORI
+  doc.setFillColor(...NAVY);
+  doc.roundedRect(12, y, 186, 8, 2, 2, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...WHITE);
+  doc.text('DISEGNAZIONE LAVORI', 20, y+5.5);
+  y += 13;
+
+  const materiali = carrello.filter(i => i.kind === 'materiale');
+  const prodotti  = carrello.filter(i => i.kind === 'prodotto');
+
+  if (materiali.length > 0) {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...SLATE9);
+    doc.text('MATERIALI E POSA IN OPERA', 12, y); y += 5;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(80, 85, 92);
+    materiali.forEach(item => {
+      const line = `• Fornitura e posa in opera di ${item.nome.toLowerCase()}.`;
+      const lines = doc.splitTextToSize(line, 182);
+      doc.text(lines, 15, y);
+      y += lines.length * 4.5;
+    });
+    y += 3;
+  }
+
+  if (prodotti.length > 0) {
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...SLATE9);
+    doc.text('PRODOTTI E FINITURE SELEZIONATE', 12, y); y += 5;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(80, 85, 92);
+    for (const item of prodotti) {
+      const imgX = 15;
+      if (item.img && item.img.startsWith('data:')) {
+        try { doc.addImage(item.img, 'JPEG', imgX, y-3, 12, 9, '', 'FAST'); } catch(e) {}
+        const line = `Fornitura e installazione: ${item.nome} (${item.meta}).`;
+        const lines = doc.splitTextToSize(line, 164);
+        doc.text(lines, imgX+14, y+2);
+        y += Math.max(lines.length * 4.5, 10);
+      } else {
+        const line = `• Fornitura e installazione: ${item.nome} (${item.meta}).`;
+        const lines = doc.splitTextToSize(line, 182);
+        doc.text(lines, 15, y);
+        y += lines.length * 4.5;
+      }
+    }
+    y += 3;
+  }
+
+  if (rincaro > 0) {
+    doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(...SLATE5);
+    doc.text('Manodopera e collaudo finale inclusi nel totale.', 12, y); y += 8;
+  }
+
+  // IVA non esposta
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...SLATE5);
+  doc.text('IVA NON ESPOSTA', 105, y, { align:'center' }); y += 6;
+
+  // box totale
+  doc.setFillColor(...NAVY);
+  doc.roundedRect(12, y, 186, 16, 3, 3, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(...WHITE);
+  doc.text('TOTALE', 20, y+10);
+  doc.setFontSize(16);
+  doc.text(`€ ${Math.round(totale).toLocaleString('it-IT')},00`, 198, y+10, { align:'right' });
+  y += 22;
+
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...SLATE5);
+  doc.text('Il totale comprende materiale e manodopera', 105, y, { align:'center' });
+
+  addFooterCliente(doc);
+  doc.save(`Preventivo_${cliente.nome.replace(/\s/g,'_')}_${nextId}.pdf`);
+}
+
+async function generaPDFInterno({ cliente, carrello, subMat, subProd, rincaro, totale, rincaroMode, rPct, rOre, rTar, nextId }) {
+  const jsPDF = await loadJsPDF();
+  const doc = new jsPDF({ unit:'mm', format:'a4', orientation:'portrait' });
+
+  // Header interno — sfondo grigio scuro
+  doc.setFillColor(...SLATE9);
+  doc.rect(0, 0, 210, 22, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(12); doc.setTextColor(...WHITE);
+  doc.text('LISTA MATERIALI DA ORDINARE', 12, 10);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(180, 185, 190);
+  doc.text('USO INTERNO — NON INVIARE AL CLIENTE', 12, 16);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(...WHITE);
+  doc.text(nextId, 198, 10, { align:'right' });
+  doc.text(oggiData(), 198, 16, { align:'right' });
+
+  let y = 30;
+
+  // info cliente
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...SLATE9);
+  doc.text(`Cliente: ${cliente.nome}`, 12, y);
+  doc.setFont('helvetica', 'normal'); doc.setTextColor(...SLATE5);
+  doc.text(`Cantiere: ${cliente.indirizzo}`, 12, y+5);
+  y += 12;
+
+  // intestazione tabella
+  doc.setFillColor(243, 244, 246);
+  doc.rect(12, y, 186, 7, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5); doc.setTextColor(...SLATE5);
+  doc.text('MATERIALE', 15, y+5);
+  doc.text('QTÀ / UNITÀ', 105, y+5);
+  doc.text('P. UNITARIO', 145, y+5);
+  doc.text('TOTALE', 195, y+5, { align:'right' });
+  y += 10;
+
+  // righe materiali
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+  carrello.forEach((item, i) => {
+    if (i % 2 === 1) { doc.setFillColor(249,250,251); doc.rect(12, y-4, 186, 7, 'F'); }
+    doc.setTextColor(...SLATE9);
+    doc.text(item.nome, 15, y);
+    doc.setTextColor(...SLATE5);
+    doc.text(item.meta, 105, y);
+    doc.text(fmtEuro2(item.prezzoUnitario), 145, y);
+    doc.setFont('helvetica','bold'); doc.setTextColor(...SLATE9);
+    doc.text(fmtEuro2(item.prezzoUnitario * item.qty), 195, y, { align:'right' });
+    doc.setFont('helvetica','normal');
+    y += 7;
+  });
+
+  if (carrello.length === 0) {
+    doc.setTextColor(...SLATE5);
+    doc.text('Nessuna voce aggiunta.', 105, y, { align:'center' });
+    y += 7;
+  }
+
+  y += 3;
+  // linea separatrice
+  doc.setDrawColor(...SLATE3); doc.setLineWidth(0.3);
+  doc.line(12, y, 198, y); y += 5;
+
+  // subtotali
+  const rows = [
+    ['Subtotale materiali + prodotti', fmtEuro2(subMat + subProd)],
+    [rincaroMode === 'percent' ? `Manodopera (${rPct}% sui materiali)` : `Manodopera (${rOre}h × ${rTar} €/h)`, fmtEuro2(rincaro)],
+  ];
+  rows.forEach(([label, value]) => {
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(...SLATE5);
+    doc.text(label, 15, y);
+    doc.setFont('helvetica', 'bold'); doc.setTextColor(...SLATE9);
+    doc.text(value, 195, y, { align:'right' });
+    y += 7;
+  });
+
+  y += 2;
+  // box totale reale
+  doc.setFillColor(...SLATE9);
+  doc.roundedRect(12, y, 186, 14, 2, 2, 'F');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...WHITE);
+  doc.text('TOTALE REALE', 20, y+9);
+  doc.setFontSize(14);
+  doc.text(`€ ${Math.round(totale).toLocaleString('it-IT')},00`, 195, y+9, { align:'right' });
+
+  doc.save(`Interno_${cliente.nome.replace(/\s/g,'_')}_${nextId}.pdf`);
+}
+
+
+const materialiIniziali = [
+  { id: 'm1', nome: 'Tubo Multistrato PE-X 20mm', unita: 'm', prezzo: 2.40, ultimoAggiornamento: '10 giu 2026' },
+  { id: 'm2', nome: 'Raccordo a pressare dritto 1/2"', unita: 'pz', prezzo: 3.80, ultimoAggiornamento: '10 giu 2026' },
+  { id: 'm3', nome: 'Filtro defangatore magnetico RBM', unita: 'pz', prezzo: 64.00, ultimoAggiornamento: '08 giu 2026' },
+  { id: 'm4', nome: 'Cavo elettrico FG16OR16 3x2.5', unita: 'm', prezzo: 1.90, ultimoAggiornamento: '08 giu 2026' },
+  { id: 'm5', nome: 'Scatola di derivazione 503 Vimar', unita: 'pz', prezzo: 4.50, ultimoAggiornamento: '02 giu 2026' },
+  { id: 'm6', nome: 'Collettore di distribuzione riscaldamento', unita: 'pz', prezzo: 118.00, ultimoAggiornamento: '29 mag 2026' },
+  { id: 'm7', nome: 'Isolante termico per tubazioni', unita: 'm', prezzo: 1.60, ultimoAggiornamento: '29 mag 2026' },
+];
+
+const tierStyle = {
+  'Standard': 'bg-slate-100 text-slate-600',
+  'Premium': 'bg-blue-50 text-blue-600',
+  'Lusso': 'bg-amber-50 text-amber-700',
+};
+
+/* Catalogo con sottocategorie — così com'è richiesto: non solo "Sanitari"
+   ma filo muro / sospeso / per disabili / a terra, così l'utente filtra subito */
+const catalogoIniziale = [
+  { id: 'p1', nome: 'Caldaia a Condensazione Beretta 24kW', categoria: 'Caldaie & Clima', sottocategoria: 'Condensazione', tier: 'Premium', prezzo: 1480 },
+  { id: 'p2', nome: 'Scaldabagno Ariston Eco 80L', categoria: 'Caldaie & Clima', sottocategoria: 'Scaldabagno', tier: 'Standard', prezzo: 389 },
+  { id: 'p3', nome: 'Climatizzatore Daikin 12000 BTU', categoria: 'Caldaie & Clima', sottocategoria: 'Climatizzazione', tier: 'Premium', prezzo: 690 },
+  { id: 'p4', nome: 'Vaso WC Sospeso Geberit', categoria: 'Sanitari', sottocategoria: 'Filo muro', tier: 'Premium', prezzo: 340 },
+  { id: 'p5', nome: 'Vaso WC a Terra Scarico Pavimento', categoria: 'Sanitari', sottocategoria: 'Scarico pavimento', tier: 'Standard', prezzo: 195 },
+  { id: 'p6', nome: 'Sanitario per Disabili Normativa L.13', categoria: 'Sanitari', sottocategoria: 'Per disabili', tier: 'Standard', prezzo: 265 },
+  { id: 'p7', nome: 'Bidet Sospeso Ceramica Dolomite', categoria: 'Sanitari', sottocategoria: 'Filo muro', tier: 'Standard', prezzo: 215 },
+  { id: 'p8', nome: 'Piatto Doccia 6mm Filo Pavimento 80x120', categoria: 'Box Doccia', sottocategoria: 'Piatto 6mm', tier: 'Premium', prezzo: 420 },
+  { id: 'p9', nome: 'Piatto Doccia 3mm Standard 70x90', categoria: 'Box Doccia', sottocategoria: 'Piatto 3mm', tier: 'Standard', prezzo: 180 },
+  { id: 'p10', nome: 'Box Doccia Cristallo Temperato 6mm', categoria: 'Box Doccia', sottocategoria: 'Box cristallo', tier: 'Standard', prezzo: 520 },
+  { id: 'p11', nome: 'Miscelatore Termostatico Grohe', categoria: 'Box Doccia', sottocategoria: 'Rubinetteria', tier: 'Lusso', prezzo: 285 },
+  { id: 'p12', nome: 'Placca Bticino Livinglight Bianca', categoria: 'Placche & Luce', sottocategoria: 'Placche', tier: 'Standard', prezzo: 38 },
+  { id: 'p13', nome: 'Presa Bticino Living con USB', categoria: 'Placche & Luce', sottocategoria: 'Prese', tier: 'Premium', prezzo: 52 },
+  { id: 'p14', nome: 'Lampadario LED Moderno', categoria: 'Placche & Luce', sottocategoria: 'Illuminazione', tier: 'Lusso', prezzo: 178 },
+];
+
+const categorieCatalogo = ['Caldaie & Clima', 'Sanitari', 'Box Doccia', 'Placche & Luce'];
+
+/* Zone/ambienti disponibili nel preventivo — richiesto dal cliente */
+const ZONE_AMBIENTI = [
+  { id: 'bagno', nome: 'Bagno', icon: '🚿' },
+  { id: 'antibagno', nome: 'Antibagno', icon: '🚪' },
+  { id: 'cucina', nome: 'Cucina', icon: '🍳' },
+  { id: 'camera', nome: 'Camera da letto', icon: '🛏️' },
+  { id: 'soggiorno', nome: 'Soggiorno', icon: '🛋️' },
+  { id: 'corridoio', nome: 'Corridoio', icon: '🚶' },
+  { id: 'esterno', nome: 'Esterno / Giardino', icon: '🌳' },
+  { id: 'centrale', nome: 'Centrale Termica', icon: '🔥' },
+  { id: 'generico', nome: 'Impianto Generico', icon: '⚡' },
+];
+
+/* Template lavori preimpostati — aprendo il template si aggiungono
+   automaticamente le voci tipiche, poi l'utente aggiusta */
+const TEMPLATE_LAVORI = [
+  {
+    id: 't1', nome: 'Sostituzione Caldaia', zona: 'centrale',
+    materiali: [
+      { nome: 'Tubo Multistrato PE-X 20mm', unita: 'm', prezzo: 2.40, qty: 6 },
+      { nome: 'Raccordo a pressare dritto 1/2"', unita: 'pz', prezzo: 3.80, qty: 4 },
+      { nome: 'Collettore di distribuzione riscaldamento', unita: 'pz', prezzo: 118.00, qty: 1 },
+    ],
+    prodottoSuggerito: 'p1',
+  },
+  {
+    id: 't2', nome: 'Rifacimento Bagno Completo', zona: 'bagno',
+    materiali: [
+      { nome: 'Tubo Multistrato PE-X 20mm', unita: 'm', prezzo: 2.40, qty: 12 },
+      { nome: 'Raccordo a pressare dritto 1/2"', unita: 'pz', prezzo: 3.80, qty: 8 },
+      { nome: 'Isolante termico per tubazioni', unita: 'm', prezzo: 1.60, qty: 10 },
+    ],
+    prodottoSuggerito: 'p4',
+  },
+  {
+    id: 't3', nome: 'Impianto Elettrico Nuovo', zona: 'generico',
+    materiali: [
+      { nome: 'Cavo elettrico FG16OR16 3x2.5', unita: 'm', prezzo: 1.90, qty: 30 },
+      { nome: 'Scatola di derivazione 503 Vimar', unita: 'pz', prezzo: 4.50, qty: 6 },
+    ],
+    prodottoSuggerito: 'p12',
+  },
+  {
+    id: 't4', nome: 'Sostituzione Sanitari', zona: 'bagno',
+    materiali: [
+      { nome: 'Raccordo a pressare dritto 1/2"', unita: 'pz', prezzo: 3.80, qty: 3 },
+    ],
+    prodottoSuggerito: 'p4',
+  },
+  {
+    id: 't5', nome: 'Box Doccia Nuovo', zona: 'bagno',
+    materiali: [
+      { nome: 'Raccordo a pressare dritto 1/2"', unita: 'pz', prezzo: 3.80, qty: 2 },
+    ],
+    prodottoSuggerito: 'p10',
+  },
+];
+
+
+/* ============================================================ */
+/* LOGIN PAGE                                                     */
+/* ============================================================ */
+
+function LoginPage({ onLogin }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onLogin();
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+      <div className="w-full max-w-sm">
+
+        <div className="flex flex-col items-center mb-8">
+          <img src={LOGO_BASE64} alt="Ferari Impianti" className="w-16 h-16 rounded-2xl shadow-sm mb-4" />
+          <h1 className="text-xl font-semibold text-slate-900 tracking-tight">Ferari Impianti</h1>
+          <p className="text-sm text-slate-500 mt-1">Accedi al tuo gestionale</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">Email</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="nome@ferariimpianti.it"
+                  className="w-full pl-10 pr-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-colors"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1.5">Password</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-10 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-colors"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-xs pt-1">
+              <label className="flex items-center gap-1.5 text-slate-500">
+                <input type="checkbox" className="rounded border-slate-300 text-blue-600 focus:ring-blue-500/30" />
+                Ricordami
+              </label>
+              <a href="#" className="text-blue-600 font-medium hover:text-blue-700">Password dimenticata?</a>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="w-full mt-6 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2"
+          >
+            Accedi
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </form>
+
+        <p className="text-center text-xs text-slate-400 mt-6">
+          Ferari Impianti S.r.l. · Gestionale Preventivi v1.0
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================ */
+/* SIDEBAR                                                        */
+/* ============================================================ */
+
+function Sidebar({ currentPage, setCurrentPage, onLogout }) {
+  const navItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'preventivi', label: 'Preventivi', icon: FileText },
+    { id: 'clienti', label: 'Clienti', icon: Users },
+    { id: 'materiali', label: 'Materiali', icon: Package },
+    { id: 'catalogo', label: 'Catalogo Prodotti', icon: ShoppingBag },
+  ];
+
+  return (
+    <aside className="w-64 bg-white border-r border-slate-200 flex flex-col h-screen sticky top-0 shrink-0">
+      <div className="px-5 py-5 border-b border-slate-100">
+        <div className="flex items-center gap-2.5">
+          <img src={LOGO_BASE64} alt="Ferari Impianti" className="w-9 h-9 rounded-lg shrink-0" />
+          <div className="leading-tight">
+            <p className="text-sm font-semibold text-slate-900">Ferari Impianti</p>
+            <p className="text-[11px] text-slate-400">Gestionale</p>
+          </div>
+        </div>
+      </div>
+
+      <nav className="flex-1 px-3 py-4 space-y-0.5">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = currentPage === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => setCurrentPage(item.id)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                isActive
+                  ? 'bg-blue-50 text-blue-700'
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <Icon className={`w-[18px] h-[18px] ${isActive ? 'text-blue-600' : 'text-slate-400'}`} />
+              {item.label}
+            </button>
+          );
+        })}
+
+        {/* Vista Squadra — non è un login separato, l'amministratore vede da qui cosa
+            vedrebbe la squadra: solo lavorazioni e materiali, zero prezzi */}
+        <div className="pt-3 mt-3 border-t border-slate-100">
+          <p className="px-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Vista squadra</p>
+          <button
+            onClick={() => setCurrentPage('squadra')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              currentPage === 'squadra'
+                ? 'bg-blue-50 text-blue-700'
+                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+            }`}
+          >
+            <Wrench className={`w-[18px] h-[18px] ${currentPage === 'squadra' ? 'text-blue-600' : 'text-slate-400'}`} />
+            Lavori Squadra
+          </button>
+        </div>
+      </nav>
+
+      <div className="px-3 py-4 border-t border-slate-100">
+        <div className="flex items-center gap-2.5 px-3 py-2">
+          <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-semibold text-slate-600 shrink-0">
+            D
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-slate-900 truncate">Denis</p>
+            <p className="text-[11px] text-slate-400 truncate">Amministratore</p>
+          </div>
+        </div>
+        <button
+          onClick={onLogout}
+          className="w-full flex items-center gap-3 px-3 py-2.5 mt-1 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50 hover:text-red-600 transition-colors"
+        >
+          <LogOut className="w-[18px] h-[18px]" />
+          Esci
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+/* ============================================================ */
+/* TOP BAR                                                        */
+/* ============================================================ */
+
+function TopBar({ title, subtitle }) {
+  return (
+    <header className="bg-white border-b border-slate-200 px-8 py-5 flex items-center justify-between">
+      <div>
+        <h1 className="text-xl font-semibold text-slate-900 tracking-tight">{title}</h1>
+        {subtitle && <p className="text-sm text-slate-500 mt-0.5">{subtitle}</p>}
+      </div>
+      <div className="flex items-center gap-3">
+        <div className="relative hidden sm:block">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Cerca..."
+            className="pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 w-56 transition-colors"
+          />
+        </div>
+        <button className="relative w-9 h-9 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors">
+          <Bell className="w-4 h-4" />
+          <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-blue-600 rounded-full"></span>
+        </button>
+      </div>
+    </header>
+  );
+}
+
+/* ============================================================ */
+/* DASHBOARD CARDS                                                */
+/* ============================================================ */
+
+function StatCard({ label, value, delta, icon: Icon, accent }) {
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl p-5">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-xs font-medium text-slate-500">{label}</p>
+          <p className="text-2xl font-semibold text-slate-900 mt-1.5 tracking-tight">{value}</p>
+        </div>
+        <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${accent}`}>
+          <Icon className="w-[18px] h-[18px]" />
+        </div>
+      </div>
+      {delta && (
+        <div className="flex items-center gap-1 mt-3">
+          <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+          <span className="text-xs font-medium text-emerald-600">{delta}</span>
+          <span className="text-xs text-slate-400">vs mese scorso</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DashboardCards({ preventivi, clienti }) {
+  const valoreTotale = preventivi.reduce((s, p) => s + p.importo, 0);
+  const inAttesa = preventivi.filter(p => p.stato === 'In Attesa').length;
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <StatCard
+        label="Preventivi"
+        value={String(preventivi.length)}
+        icon={FileText}
+        accent="bg-blue-50 text-blue-600"
+      />
+      <StatCard
+        label="Clienti"
+        value={String(clienti.length)}
+        icon={Users}
+        accent="bg-slate-100 text-slate-600"
+      />
+      <StatCard
+        label="Valore Totale"
+        value={fmtEuro(valoreTotale)}
+        icon={Euro}
+        accent="bg-emerald-50 text-emerald-600"
+      />
+      <StatCard
+        label="In Attesa"
+        value={String(inAttesa)}
+        icon={Clock}
+        accent="bg-amber-50 text-amber-600"
+      />
+    </div>
+  );
+}
+
+/* ============================================================ */
+/* TABELLA PREVENTIVI RECENTI                                     */
+/* ============================================================ */
+
+function PreventiviTable({ preventivi, onVediTutti }) {
+  const recenti = preventivi.slice(0, 6);
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900">Preventivi Recenti</h2>
+        </div>
+        <button onClick={onVediTutti} className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700">
+          Vedi tutti
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-100">
+              <th className="text-left font-medium text-slate-500 text-xs px-5 py-3">N. Documento</th>
+              <th className="text-left font-medium text-slate-500 text-xs px-5 py-3">Cliente</th>
+              <th className="text-left font-medium text-slate-500 text-xs px-5 py-3 hidden md:table-cell">Cantiere</th>
+              <th className="text-left font-medium text-slate-500 text-xs px-5 py-3 hidden sm:table-cell">Data</th>
+              <th className="text-right font-medium text-slate-500 text-xs px-5 py-3">Importo</th>
+              <th className="text-left font-medium text-slate-500 text-xs px-5 py-3">Stato</th>
+              <th className="px-5 py-3"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {recenti.map((p) => (
+              <tr key={p.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60 transition-colors">
+                <td className="px-5 py-3.5 font-mono text-xs text-slate-500">{p.id}</td>
+                <td className="px-5 py-3.5 font-medium text-slate-900">{p.cliente}</td>
+                <td className="px-5 py-3.5 text-slate-500 hidden md:table-cell">{p.cantiere}</td>
+                <td className="px-5 py-3.5 text-slate-500 hidden sm:table-cell">{p.data}</td>
+                <td className="px-5 py-3.5 text-right font-semibold text-slate-900">{fmtEuro(p.importo)}</td>
+                <td className="px-5 py-3.5">
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium ${statoStyle[p.stato]}`}>
+                    {p.stato}
+                  </span>
+                </td>
+                <td className="px-5 py-3.5 text-right">
+                  <button className="text-slate-400 hover:text-slate-600">
+                    <MoreHorizontal className="w-4 h-4" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {recenti.length === 0 && (
+              <tr><td colSpan="7" className="px-5 py-10 text-center text-sm text-slate-400">Nessun preventivo ancora.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================ */
+/* DASHBOARD PAGE                                                 */
+/* ============================================================ */
+
+function DashboardPage({ preventivi, clienti, onVediTutti }) {
+  return (
+    <div className="px-8 py-6 space-y-6">
+      <DashboardCards preventivi={preventivi} clienti={clienti} />
+      <PreventiviTable preventivi={preventivi} onVediTutti={onVediTutti} />
+    </div>
+  );
+}
+
+/* ============================================================ */
+/* PAGINA CLIENTI — anagrafica, ricerca, scheda con storico       */
+/* ============================================================ */
+
+function ClientiPage({ clienti, setClienti, preventivi, onNuovoPreventivo }) {
+  const [search, setSearch] = useState('');
+  const [selectedId, setSelectedId] = useState(null);
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [newNome, setNewNome] = useState('');
+  const [newIndirizzo, setNewIndirizzo] = useState('');
+  const [newTelefono, setNewTelefono] = useState('');
+  const [noteInput, setNoteInput] = useState('');
+
+  const selected = clienti.find(c => c.id === selectedId);
+
+  const filtered = clienti
+    .filter(c => c.nome.toLowerCase().includes(search.toLowerCase()) || c.indirizzo.toLowerCase().includes(search.toLowerCase()))
+    .sort((a, b) => a.nome.localeCompare(b.nome));
+
+  const initials = (nome) => nome.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
+  const addCliente = () => {
+    if (!newNome.trim()) return;
+    const nuovo = {
+      id: 'c' + Date.now(),
+      nome: newNome.trim(),
+      indirizzo: newIndirizzo.trim() || 'Indirizzo da definire',
+      telefono: newTelefono.trim(),
+      note: [],
+    };
+    setClienti([nuovo, ...clienti]);
+    setNewNome('');
+    setNewIndirizzo('');
+    setNewTelefono('');
+    setShowNewForm(false);
+    setSelectedId(nuovo.id);
+  };
+
+  const addNota = () => {
+    if (!noteInput.trim() || !selected) return;
+    const d = new Date();
+    const data = d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
+    setClienti(clienti.map(c => c.id === selected.id
+      ? { ...c, note: [...c.note, { text: noteInput.trim(), data }] }
+      : c
+    ));
+    setNoteInput('');
+  };
+
+  const storicoCliente = preventivi.filter(p => p.clienteId === selectedId);
+
+  /* ---- vista dettaglio cliente ---- */
+  if (selected) {
+    return (
+      <div className="px-8 py-6 space-y-5 max-w-3xl">
+        <button
+          onClick={() => setSelectedId(null)}
+          className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Torna ai clienti
+        </button>
+
+        <div className="bg-white border border-slate-200 rounded-2xl p-6">
+          <div className="flex items-start justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-slate-900 flex items-center justify-center text-white font-bold text-lg shrink-0">
+                {initials(selected.nome)}
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 tracking-tight">{selected.nome}</h2>
+                <p className="text-sm text-slate-500 mt-0.5">{selected.indirizzo}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => onNuovoPreventivo(selected.id)}
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Nuovo Preventivo
+            </button>
+          </div>
+
+          {selected.telefono && (
+            <div className="flex gap-2.5 mt-5">
+              <a href={`tel:${selected.telefono.replace(/\s/g, '')}`} className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold px-3.5 py-2.5 rounded-lg transition-colors">
+                <Phone className="w-3.5 h-3.5" />
+                Chiama
+              </a>
+              <a href={`https://wa.me/${selected.telefono.replace(/[^\d+]/g, '').replace('+', '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold px-3.5 py-2.5 rounded-lg transition-colors">
+                <MessageCircle className="w-3.5 h-3.5" />
+                WhatsApp
+              </a>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100">
+            <h3 className="text-sm font-semibold text-slate-900">Storico preventivi</h3>
+            <p className="text-xs text-slate-400 mt-0.5">{storicoCliente.length} documenti</p>
+          </div>
+          {storicoCliente.length === 0 ? (
+            <p className="text-sm text-slate-400 text-center py-8">Nessun preventivo ancora per questo cliente.</p>
+          ) : (
+            <div className="divide-y divide-slate-50">
+              {storicoCliente.map(p => (
+                <div key={p.id} className="px-5 py-3.5 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 shrink-0">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-900">{p.id}</p>
+                      <p className="text-xs text-slate-400 font-mono">{p.data}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium ${statoStyle[p.stato]}`}>{p.stato}</span>
+                    <span className="text-sm font-semibold text-slate-900 w-20 text-right">{fmtEuro(p.importo)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100">
+            <h3 className="text-sm font-semibold text-slate-900">Note e comunicazioni</h3>
+          </div>
+          <div className="px-5 py-4 space-y-2">
+            {selected.note.length === 0 && (
+              <p className="text-xs text-slate-400 text-center py-3">Nessuna nota ancora.</p>
+            )}
+            {[...selected.note].reverse().map((n, i) => (
+              <div key={i} className="bg-slate-50 border border-slate-100 rounded-lg px-3.5 py-2.5">
+                <p className="text-sm text-slate-700">{n.text}</p>
+                <p className="text-[11px] text-slate-400 mt-1 font-mono">{n.data}</p>
+              </div>
+            ))}
+          </div>
+          <div className="px-5 pb-4 flex gap-2">
+            <input
+              type="text"
+              value={noteInput}
+              onChange={(e) => setNoteInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && addNota()}
+              placeholder="Aggiungi una nota su questo cliente..."
+              className="flex-1 px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+            />
+            <button onClick={addNota} className="w-10 h-10 rounded-lg bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center shrink-0">
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---- vista lista clienti ---- */
+  return (
+    <div className="px-8 py-6 space-y-5">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[220px] max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cerca cliente, città..."
+            className="w-full pl-9 pr-4 py-2.5 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+          />
+        </div>
+        <button
+          onClick={() => setShowNewForm(!showNewForm)}
+          className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-3.5 py-2.5 rounded-lg transition-colors"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Nuovo cliente
+        </button>
+      </div>
+
+      {showNewForm && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-4">
+          <p className="text-xs font-semibold text-slate-500 mb-3">Nuovo cliente</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <input
+              type="text"
+              value={newNome}
+              onChange={(e) => setNewNome(e.target.value)}
+              placeholder="Nome e cognome"
+              className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+            />
+            <input
+              type="text"
+              value={newIndirizzo}
+              onChange={(e) => setNewIndirizzo(e.target.value)}
+              placeholder="Indirizzo cantiere"
+              className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+            />
+            <input
+              type="text"
+              value={newTelefono}
+              onChange={(e) => setNewTelefono(e.target.value)}
+              placeholder="Telefono"
+              className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+            />
+          </div>
+          <div className="flex gap-2 mt-3">
+            <button onClick={addCliente} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors">
+              Salva cliente
+            </button>
+            <button onClick={() => setShowNewForm(false)} className="px-3 py-2 text-slate-400 hover:text-slate-600 text-sm">
+              Annulla
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+        <div className="divide-y divide-slate-50">
+          {filtered.map(c => {
+            const docCount = preventivi.filter(p => p.clienteId === c.id).length;
+            return (
+              <button
+                key={c.id}
+                onClick={() => setSelectedId(c.id)}
+                className="w-full flex items-center gap-3.5 px-5 py-3.5 text-left hover:bg-slate-50/60 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-semibold text-slate-600 text-xs shrink-0">
+                  {initials(c.nome)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-slate-900 truncate">{c.nome}</p>
+                  <p className="text-xs text-slate-400 truncate mt-0.5">{c.indirizzo}</p>
+                </div>
+                <div className="text-right shrink-0 hidden sm:block">
+                  <p className="text-xs text-slate-400">{docCount} {docCount === 1 ? 'preventivo' : 'preventivi'}</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+              </button>
+            );
+          })}
+          {filtered.length === 0 && (
+            <p className="text-sm text-slate-400 text-center py-10">Nessun cliente trovato.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+/* ============================================================ */
+/* PAGINA PREVENTIVI — lista + flusso completo di creazione        */
+/* ============================================================ */
+
+/* ============================================================ */
+/* NUOVO CLIENTE INLINE — usato dentro il form preventivo        */
+/* ============================================================ */
+function NuovoClienteInline({ onSalva }) {
+  const [aperto, setAperto] = useState(false);
+  const [nome, setNome] = useState('');
+  const [indirizzo, setIndirizzo] = useState('');
+  const [telefono, setTelefono] = useState('');
+
+  const salva = () => {
+    if (!nome.trim()) return;
+    onSalva({
+      nome: nome.trim(),
+      indirizzo: indirizzo.trim() || 'Indirizzo da definire',
+      telefono: telefono.trim(),
+    });
+    setNome(''); setIndirizzo(''); setTelefono('');
+    setAperto(false);
+  };
+
+  if (!aperto) {
+    return (
+      <button
+        onClick={() => setAperto(true)}
+        className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-slate-300 hover:border-blue-400 hover:bg-blue-50/50 text-slate-500 hover:text-blue-600 text-sm font-medium py-4 rounded-2xl transition-colors"
+      >
+        <Plus className="w-4 h-4" />
+        Aggiungi nuovo cliente
+      </button>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl p-6">
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm font-semibold text-slate-900">Nuovo cliente</p>
+        <button onClick={() => setAperto(false)} className="text-slate-400 hover:text-slate-600">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="space-y-3">
+        <div>
+          <label className="block text-xs font-medium text-slate-500 mb-1">Nome e cognome *</label>
+          <input
+            type="text"
+            value={nome}
+            onChange={e => setNome(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && salva()}
+            placeholder="Es. Giuseppe Martini"
+            className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+            autoFocus
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-500 mb-1">Indirizzo cantiere</label>
+          <input
+            type="text"
+            value={indirizzo}
+            onChange={e => setIndirizzo(e.target.value)}
+            placeholder="Es. Via Mazzini 8, Bologna"
+            className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-500 mb-1">Telefono</label>
+          <input
+            type="tel"
+            value={telefono}
+            onChange={e => setTelefono(e.target.value)}
+            placeholder="+39 333 1234567"
+            className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+          />
+        </div>
+      </div>
+      <div className="flex gap-2 mt-4">
+        <button
+          onClick={salva}
+          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors"
+        >
+          Salva e usa questo cliente
+        </button>
+        <button
+          onClick={() => setAperto(false)}
+          className="px-4 py-2.5 text-sm text-slate-500 hover:text-slate-700"
+        >
+          Annulla
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================ */
+/* PREVENTIVI PAGE                                               */
+/* ============================================================ */
+function PreventiviPage({ clienti, setClienti, preventivi, setPreventivi, materiali, setMateriali, prodotti, presetClienteId, onConsumePreset }) {
+  const [mode, setMode] = useState('lista'); // 'lista' | 'nuovo' | 'dettaglio'
+  const [clienteId, setClienteId] = useState(null);
+  const [statoEditId, setStatoEditId] = useState(null); // id preventivo in cambio stato
+  const [dettaglioId, setDettaglioId] = useState(null);
+
+  // helper per aggiornare clienti dal form inline
+  const setClientiEsterni = setClienti;
+  const [carrello, setCarrello] = useState([]); // { id, nome, meta, prezzoUnitario, qty, kind }
+  const [rincaroMode, setRincaroMode] = useState('percent');
+  const [rincaroPercent, setRincaroPercent] = useState('10');
+  const [rincaroOre, setRincaroOre] = useState('8');
+  const [rincaroTariffa, setRincaroTariffa] = useState('35');
+  const [activeCat, setActiveCat] = useState('Caldaie & Clima');
+  const [savedFlashId, setSavedFlashId] = useState(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewView, setPreviewView] = useState('cliente'); // 'cliente' | 'interno'
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [zonaAttiva, setZonaAttiva] = useState('generico');
+  const [fotoCantiere, setFotoCantiere] = useState([]); // { id, dataUrl, tipo: 'prima'|'dopo', zona }
+
+  // apre direttamente il flusso "nuovo" se arriviamo da una scheda cliente
+  React.useEffect(() => {
+    if (presetClienteId) {
+      setClienteId(presetClienteId);
+      setCarrello([]);
+      setMode('nuovo');
+      onConsumePreset();
+    }
+  }, [presetClienteId]);
+
+  const cliente = clienti.find(c => c.id === clienteId);
+
+  const subtotaleMateriali = carrello.filter(i => i.kind === 'materiale').reduce((s, i) => s + i.prezzoUnitario * i.qty, 0);
+  const subtotaleProdotti = carrello.filter(i => i.kind === 'prodotto').reduce((s, i) => s + i.prezzoUnitario * i.qty, 0);
+  const rincaroValore = rincaroMode === 'percent'
+    ? subtotaleMateriali * ((parseFloat(rincaroPercent) || 0) / 100)
+    : (parseFloat(rincaroOre) || 0) * (parseFloat(rincaroTariffa) || 0);
+  const totale = subtotaleMateriali + subtotaleProdotti + rincaroValore;
+
+  const startNuovo = () => {
+    setClienteId(null);
+    setCarrello([]);
+    setRincaroMode('percent');
+    setRincaroPercent('10');
+    setRincaroOre('8');
+    setRincaroTariffa('35');
+    setZonaAttiva('generico');
+    setFotoCantiere([]);
+    setMode('nuovo');
+  };
+
+  const aggiornaPrezzoMateriale = (matId, valoreStr) => {
+    const valore = parseFloat(valoreStr.replace(',', '.'));
+    setMateriali(materiali.map(m => m.id === matId ? { ...m, prezzo: isNaN(valore) ? m.prezzo : valore } : m));
+    if (!isNaN(valore) && valore > 0) {
+      const mat = materiali.find(m => m.id === matId);
+      setCarrello(prev => {
+        const exists = prev.find(i => i.id === matId);
+        const qty = exists ? exists.qty : 1;
+        const nuovaVoce = { id: matId, nome: mat.nome, meta: `${qty} ${mat.unita} × ${valore.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €`, prezzoUnitario: valore, qty, kind: 'materiale', zona: exists?.zona || zonaAttiva };
+        if (exists) return prev.map(i => i.id === matId ? nuovaVoce : i);
+        return [...prev, nuovaVoce];
+      });
+      setSavedFlashId(matId);
+      setTimeout(() => setSavedFlashId(null), 1500);
+    } else if (valoreStr === '') {
+      setCarrello(prev => prev.filter(i => i.id !== matId));
+    }
+  };
+
+  const aggiornaQtyMateriale = (matId, qty) => {
+    const mat = materiali.find(m => m.id === matId);
+    setCarrello(prev => prev.map(i => i.id === matId
+      ? { ...i, qty, meta: `${qty} ${mat.unita} × ${i.prezzoUnitario.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €` }
+      : i
+    ));
+  };
+
+  const toggleProdotto = (p) => {
+    const exists = carrello.find(i => i.id === p.id);
+    if (exists) {
+      setCarrello(carrello.filter(i => i.id !== p.id));
+    } else {
+      setCarrello([...carrello, { id: p.id, nome: p.nome, meta: p.tier, prezzoUnitario: p.prezzo, qty: 1, kind: 'prodotto', zona: zonaAttiva }]);
+    }
+  };
+
+  // Applica un template di lavoro — aggiunge automaticamente i materiali tipici,
+  // così non si devono cercarli uno per uno per i lavori più comuni
+  const applicaTemplate = (template) => {
+    setZonaAttiva(template.zona);
+    template.materiali.forEach(tm => {
+      const matEsistente = materiali.find(m => m.nome === tm.nome);
+      const matId = matEsistente ? matEsistente.id : 'tmp-' + tm.nome.replace(/\s/g, '');
+      if (!matEsistente) {
+        setMateriali(prevMat => [...prevMat, { id: matId, nome: tm.nome, unita: tm.unita, prezzo: tm.prezzo, ultimoAggiornamento: oggiStr() }]);
+      }
+      setCarrello(prev => {
+        const exists = prev.find(i => i.id === matId);
+        if (exists) return prev;
+        return [...prev, {
+          id: matId, nome: tm.nome,
+          meta: `${tm.qty} ${tm.unita} × ${tm.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €`,
+          prezzoUnitario: tm.prezzo, qty: tm.qty, kind: 'materiale', zona: template.zona,
+        }];
+      });
+    });
+    if (template.prodottoSuggerito) {
+      const prod = prodotti.find(p => p.id === template.prodottoSuggerito);
+      if (prod) {
+        setCarrello(prev => {
+          if (prev.find(i => i.id === prod.id)) return prev;
+          return [...prev, { id: prod.id, nome: prod.nome, meta: prod.tier, prezzoUnitario: prod.prezzo, qty: 1, kind: 'prodotto', zona: template.zona }];
+        });
+      }
+    }
+  };
+
+  // Gestione foto cantiere — simulata in locale (base64), l'app richiede
+  // almeno 2 foto prima di poter salvare il preventivo come richiesto
+  const gestisciFoto = (fileList, tipo) => {
+    Array.from(fileList).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setFotoCantiere(prev => [...prev, { id: 'f' + Date.now() + Math.random(), dataUrl: e.target.result, tipo, zona: zonaAttiva }]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const rimuoviFoto = (id) => setFotoCantiere(prev => prev.filter(f => f.id !== id));
+
+  const rimuoviVoce = (id) => setCarrello(carrello.filter(i => i.id !== id));
+
+  const cambiaStato = (id, nuovoStato) => {
+    setPreventivi(preventivi.map(p => p.id === id ? { ...p, stato: nuovoStato } : p));
+    setStatoEditId(null);
+  };
+
+  const maxNum = Math.max(...preventivi.map(p => parseInt(p.id.replace('PV-', '')) || 0), 148);
+  const numeroDocumento = 'PV-' + String(maxNum + 1).padStart(4, '0');
+  const dataDocumento = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  const salvaPreventivo = () => {
+    if (!cliente || carrello.length === 0) return;
+    const zoneCoinvolte = [...new Set(carrello.map(i => i.zona || 'generico'))];
+    const nuovo = {
+      id: numeroDocumento,
+      clienteId: cliente.id,
+      cliente: cliente.nome,
+      cantiere: cliente.indirizzo.split(',').pop().trim(),
+      data: new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' }),
+      importo: Math.round(totale),
+      stato: 'In Attesa',
+      zone: zoneCoinvolte,
+      nFoto: fotoCantiere.length,
+      carrelloSnapshot: carrello,
+    };
+    setPreventivi([nuovo, ...preventivi]);
+    setShowPreview(false);
+    setShowSuccess(true);
+  };
+
+  const chiudiSuccess = () => {
+    setShowSuccess(false);
+    setMode('lista');
+  };
+
+  /* ---- vista lista ---- */
+  if (mode === 'lista') {
+    return (
+      <div className="px-8 py-6 space-y-5">
+        <div className="flex items-center justify-end">
+          <button
+            onClick={startNuovo}
+            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Nuovo Preventivo
+          </button>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  <th className="text-left font-medium text-slate-500 text-xs px-5 py-3">N. Documento</th>
+                  <th className="text-left font-medium text-slate-500 text-xs px-5 py-3">Cliente</th>
+                  <th className="text-left font-medium text-slate-500 text-xs px-5 py-3 hidden md:table-cell">Cantiere</th>
+                  <th className="text-left font-medium text-slate-500 text-xs px-5 py-3 hidden sm:table-cell">Data</th>
+                  <th className="text-right font-medium text-slate-500 text-xs px-5 py-3">Importo</th>
+                  <th className="text-left font-medium text-slate-500 text-xs px-5 py-3">Stato</th>
+                </tr>
+              </thead>
+              <tbody>
+                {preventivi.map((p) => (
+                  <tr
+                    key={p.id}
+                    onClick={() => { setDettaglioId(p.id); setMode('dettaglio'); }}
+                    className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60 transition-colors cursor-pointer"
+                  >
+                    <td className="px-5 py-3.5 font-mono text-xs text-slate-500">{p.id}</td>
+                    <td className="px-5 py-3.5 font-medium text-slate-900">{p.cliente}</td>
+                    <td className="px-5 py-3.5 text-slate-500 hidden md:table-cell">{p.cantiere}</td>
+                    <td className="px-5 py-3.5 text-slate-500 hidden sm:table-cell">{p.data}</td>
+                    <td className="px-5 py-3.5 text-right font-semibold text-slate-900">{fmtEuro(p.importo)}</td>
+                    <td className="px-5 py-3.5" onClick={(e) => e.stopPropagation()}>
+                      {statoEditId === p.id ? (
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {['In Attesa', 'Accettato', 'Inviato', 'Rifiutato'].map(s => (
+                            <button
+                              key={s}
+                              onClick={() => cambiaStato(p.id, s)}
+                              className={`px-2 py-1 rounded-full text-[10px] font-semibold border transition-opacity hover:opacity-80 ${statoStyle[s] || 'bg-red-50 text-red-600 ring-1 ring-red-400/30'}`}
+                            >
+                              {s}
+                            </button>
+                          ))}
+                          <button onClick={() => setStatoEditId(null)} className="text-slate-400 hover:text-slate-600 ml-1">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setStatoEditId(p.id)}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium hover:opacity-75 transition-opacity ${statoStyle[p.stato] || 'bg-red-50 text-red-600 ring-1 ring-red-400/30'}`}
+                        >
+                          {p.stato}
+                          <Pencil className="w-2.5 h-2.5 opacity-60" />
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {preventivi.length === 0 && (
+                  <tr><td colSpan="6" className="px-5 py-10 text-center text-sm text-slate-400">Nessun preventivo ancora.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---- vista dettaglio preventivo esistente ---- */
+  if (mode === 'dettaglio') {
+    const p = preventivi.find(pv => pv.id === dettaglioId);
+    const clienteDett = p ? clienti.find(c => c.id === p.clienteId) : null;
+    const carrelloDett = p?.carrelloSnapshot || [];
+    const rincaroDett = p?.importo && carrelloDett.length
+      ? p.importo - carrelloDett.reduce((s, i) => s + i.prezzoUnitario * i.qty, 0)
+      : 0;
+    if (!p) { setMode('lista'); return null; }
+    return (
+      <div className="px-8 py-6 space-y-5 max-w-3xl">
+        <button onClick={() => setMode('lista')} className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900">
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Torna ai preventivi
+        </button>
+
+        <div className="bg-white border border-slate-200 rounded-2xl px-6 py-5 flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <p className="font-mono text-xs text-slate-400">{p.id}</p>
+            <p className="text-lg font-bold text-slate-900 mt-0.5">{clienteDett?.nome || p.cliente}</p>
+            <p className="text-sm text-slate-500 mt-0.5">{clienteDett?.indirizzo || p.cantiere} · {p.data}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-2xl font-bold text-slate-900">{fmtEuro(p.importo)}</p>
+            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium mt-1 ${statoStyle[p.stato] || 'bg-red-50 text-red-600'}`}>{p.stato}</span>
+          </div>
+        </div>
+
+        {(p.zone || []).length > 0 && (
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100">
+              <p className="text-sm font-semibold text-slate-900">Lavorazioni per zona</p>
+            </div>
+            <div className="p-5 space-y-4">
+              {p.zone.map(zonaId => {
+                const zonaInfo = ZONE_AMBIENTI.find(z => z.id === zonaId);
+                const vociZona = carrelloDett.filter(i => (i.zona || 'generico') === zonaId);
+                return (
+                  <div key={zonaId}>
+                    <p className="text-sm font-bold text-slate-800 flex items-center gap-1.5 mb-1.5">
+                      <span>{zonaInfo?.icon}</span>{zonaInfo?.nome || zonaId}
+                    </p>
+                    <ul className="space-y-1">
+                      {vociZona.map(v => (
+                        <li key={v.id} className="text-sm text-slate-600 flex items-center justify-between">
+                          <span>{v.nome} <span className="text-slate-400 font-mono text-xs">({v.meta})</span></span>
+                          <span className="font-semibold text-slate-900">{fmtEuro(Math.round(v.prezzoUnitario * v.qty))}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {p.nFoto > 0 && (
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100">
+              <p className="text-sm font-semibold text-slate-900">Foto cantiere ({p.nFoto})</p>
+            </div>
+            <div className="p-5 text-sm text-slate-400">
+              Le foto sono archiviate con questo preventivo.
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-2.5">
+          <button
+            onClick={async () => {
+              if (!clienteDett) return;
+              await generaPDFCliente({ cliente: clienteDett, carrello: carrelloDett, rincaro: rincaroDett, totale: p.importo, nextId: p.id, logoB64: LOGO_BASE64 });
+            }}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+          >
+            <Download className="w-4 h-4" />
+            PDF per il Cliente
+          </button>
+          <button
+            onClick={async () => {
+              if (!clienteDett) return;
+              const subMat = carrelloDett.filter(i => i.kind === 'materiale').reduce((s, i) => s + i.prezzoUnitario * i.qty, 0);
+              const subProd = carrelloDett.filter(i => i.kind === 'prodotto').reduce((s, i) => s + i.prezzoUnitario * i.qty, 0);
+              await generaPDFInterno({ cliente: clienteDett, carrello: carrelloDett, subMat, subProd, rincaro: rincaroDett, totale: p.importo, rincaroMode: 'percent', rPct: '10', rOre: '8', rTar: '35', nextId: p.id });
+            }}
+            className="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+          >
+            <Download className="w-4 h-4" />
+            PDF Interno
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---- vista creazione nuovo preventivo ---- */
+  return (
+    <div className="px-8 py-6 pb-28">
+      <button onClick={() => setMode('lista')} className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 mb-5">
+        <ArrowLeft className="w-3.5 h-3.5" />
+        Torna ai preventivi
+      </button>
+
+      {!cliente ? (
+        <div className="max-w-lg space-y-4">
+          {/* Selezione cliente esistente */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-6">
+            <p className="text-sm font-semibold text-slate-900 mb-1">Seleziona il cliente</p>
+            <p className="text-xs text-slate-400 mb-4">Per quale cliente stai preparando questo preventivo?</p>
+            <select
+              value={clienteId || ''}
+              onChange={(e) => { if (e.target.value) setClienteId(e.target.value); }}
+              className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+            >
+              <option value="">Scegli un cliente esistente...</option>
+              {clienti.map(c => <option key={c.id} value={c.id}>{c.nome} — {c.indirizzo}</option>)}
+            </select>
+          </div>
+
+          {/* Separatore */}
+          <div className="flex items-center gap-3">
+            <div className="flex-1 h-px bg-slate-200"></div>
+            <span className="text-xs text-slate-400 font-medium">oppure</span>
+            <div className="flex-1 h-px bg-slate-200"></div>
+          </div>
+
+          {/* Nuovo cliente inline */}
+          <NuovoClienteInline
+            onSalva={(nuovoCliente) => {
+              const c = { id: 'c' + Date.now(), ...nuovoCliente, note: [] };
+              setClientiEsterni(prev => [c, ...prev]);
+              setClienteId(c.id);
+            }}
+          />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-5 items-start">
+
+          <div className="space-y-5 min-w-0">
+
+            <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4">
+              <p className="text-[11px] text-slate-400 uppercase tracking-wide font-semibold">Preventivo per</p>
+              <p className="text-sm font-bold text-slate-900 mt-0.5">{cliente.nome} · {cliente.indirizzo}</p>
+            </div>
+
+            {/* zona / ambiente attivo */}
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-slate-100">
+                <p className="text-sm font-semibold text-slate-900">Zona di lavoro</p>
+              </div>
+              <div className="p-4 flex flex-wrap gap-2">
+                {ZONE_AMBIENTI.map(z => (
+                  <button
+                    key={z.id}
+                    onClick={() => setZonaAttiva(z.id)}
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                      zonaAttiva === z.id
+                        ? 'bg-slate-900 text-white'
+                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span>{z.icon}</span>{z.nome}
+                  </button>
+                ))}
+              </div>
+
+              {/* template lavori per la zona selezionata */}
+              {TEMPLATE_LAVORI.filter(t => t.zona === zonaAttiva).length > 0 && (
+                <div className="px-4 pb-4">
+                  <div className="flex flex-wrap gap-2">
+                    {TEMPLATE_LAVORI.filter(t => t.zona === zonaAttiva).map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => applicaTemplate(t)}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        {t.nome}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* foto cantiere */}
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-900">Foto cantiere</p>
+                <span className={`text-[11px] font-semibold px-2 py-1 rounded-full ${fotoCantiere.length >= 2 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                  {fotoCantiere.length} {fotoCantiere.length === 1 ? 'foto' : 'foto'}
+                </span>
+              </div>
+              <div className="p-4">
+                <div className="flex gap-2 mb-3">
+                  <label className="flex-1 flex items-center justify-center gap-1.5 border-2 border-dashed border-slate-300 hover:border-blue-400 hover:bg-blue-50/40 text-slate-500 hover:text-blue-600 text-xs font-semibold py-3 rounded-xl cursor-pointer transition-colors">
+                    <ImagePlus className="w-4 h-4" />
+                    Foto "Prima"
+                    <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { if (e.target.files.length) gestisciFoto(e.target.files, 'prima'); e.target.value = ''; }} />
+                  </label>
+                  <label className="flex-1 flex items-center justify-center gap-1.5 border-2 border-dashed border-slate-300 hover:border-emerald-400 hover:bg-emerald-50/40 text-slate-500 hover:text-emerald-600 text-xs font-semibold py-3 rounded-xl cursor-pointer transition-colors">
+                    <ImagePlus className="w-4 h-4" />
+                    Foto "Dopo"
+                    <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => { if (e.target.files.length) gestisciFoto(e.target.files, 'dopo'); e.target.value = ''; }} />
+                  </label>
+                </div>
+                {fotoCantiere.length > 0 && (
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                    {fotoCantiere.map(f => (
+                      <div key={f.id} className="relative group aspect-square rounded-lg overflow-hidden border border-slate-200">
+                        <img src={f.dataUrl} alt="" className="w-full h-full object-cover" />
+                        <span className={`absolute bottom-0 left-0 right-0 text-[9px] font-bold text-center py-0.5 text-white ${f.tipo === 'prima' ? 'bg-amber-500/90' : 'bg-emerald-500/90'}`}>
+                          {f.tipo === 'prima' ? 'PRIMA' : 'DOPO'}
+                        </span>
+                        <button
+                          onClick={() => rimuoviFoto(f.id)}
+                          className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* materiali */}
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-slate-100">
+                <p className="text-sm font-semibold text-slate-900">Materiali grezzi</p>
+
+              </div>
+              <div className="divide-y divide-slate-50">
+                {materiali.map(m => {
+                  const inCarrello = carrello.find(i => i.id === m.id);
+                  return (
+                    <div key={m.id} className="px-5 py-3 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate">{m.nome}</p>
+                        <p className="text-xs text-slate-400">{m.unita === 'm' ? 'al metro' : 'a pezzo'}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-1">
+                          <button onClick={() => aggiornaQtyMateriale(m.id, Math.max(1, (inCarrello?.qty || 1) - 1))} className="text-slate-400 w-5 text-center font-bold">−</button>
+                          <span className="w-6 text-center text-xs font-mono text-slate-700">{inCarrello?.qty || 0}</span>
+                          <button onClick={() => aggiornaQtyMateriale(m.id, (inCarrello?.qty || 1) + 1)} className="text-slate-400 w-5 text-center font-bold">+</button>
+                        </div>
+                        <div className={`flex items-center gap-1 border rounded-lg px-2.5 py-1.5 transition-colors ${savedFlashId === m.id ? 'bg-emerald-50 border-emerald-300' : 'bg-slate-50 border-slate-200'}`}>
+                          <span className="text-slate-400 text-xs">€</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            defaultValue={m.prezzo ? m.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 }) : ''}
+                            onChange={(e) => aggiornaPrezzoMateriale(m.id, e.target.value)}
+                            className="w-16 bg-transparent text-right text-sm font-mono text-slate-900 outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* rincaro */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <p className="text-sm font-semibold text-slate-900 mb-3">Manodopera & rincaro</p>
+              <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1 mb-3">
+                <button
+                  onClick={() => setRincaroMode('percent')}
+                  className={`flex-1 text-xs font-semibold py-2 rounded-lg transition-colors ${rincaroMode === 'percent' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}
+                >
+                  % sul materiale
+                </button>
+                <button
+                  onClick={() => setRincaroMode('ore')}
+                  className={`flex-1 text-xs font-semibold py-2 rounded-lg transition-colors ${rincaroMode === 'ore' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}
+                >
+                  Ore × tariffa
+                </button>
+              </div>
+              {rincaroMode === 'percent' ? (
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-slate-600">Maggiorazione materiale</p>
+                  <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5">
+                    <input type="text" inputMode="numeric" value={rincaroPercent} onChange={(e) => setRincaroPercent(e.target.value)} className="w-10 bg-transparent text-right text-sm font-mono outline-none" />
+                    <span className="text-slate-400 text-xs">%</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-slate-600">Ore di lavoro previste</p>
+                    <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5">
+                      <input type="text" inputMode="numeric" value={rincaroOre} onChange={(e) => setRincaroOre(e.target.value)} className="w-10 bg-transparent text-right text-sm font-mono outline-none" />
+                      <span className="text-slate-400 text-xs">h</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-slate-600">Tariffa oraria</p>
+                    <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5">
+                      <span className="text-slate-400 text-xs">€</span>
+                      <input type="text" inputMode="numeric" value={rincaroTariffa} onChange={(e) => setRincaroTariffa(e.target.value)} className="w-10 bg-transparent text-right text-sm font-mono outline-none" />
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="border-t border-slate-200 mt-3 pt-3 flex items-center justify-between">
+                <p className="text-xs font-semibold text-slate-500">Manodopera stimata</p>
+                <p className="text-sm font-bold text-slate-900">{fmtEuro(Math.round(rincaroValore))}</p>
+              </div>
+            </div>
+
+            {/* catalogo */}
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
+                <p className="text-sm font-semibold text-slate-900">Catalogo prodotti</p>
+                <div className="flex gap-1 overflow-x-auto">
+                  {categorieCatalogo.map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => setActiveCat(cat)}
+                      className={`px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-colors ${activeCat === cat ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-500'}`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4">
+                {prodotti.filter(p => p.categoria === activeCat).map(p => {
+                  const isAdded = !!carrello.find(i => i.id === p.id);
+                  return (
+                    <div key={p.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                      <div className="h-16 bg-slate-50 flex items-center justify-center">
+                        <ImagePlus className="w-4 h-4 text-slate-300" />
+                      </div>
+                      <div className="p-2.5">
+                        <p className="text-[11px] font-semibold text-slate-900 leading-snug line-clamp-2 min-h-[28px]">{p.nome}</p>
+                        <p className="text-xs font-bold text-slate-900 mt-1">{fmtEuro(p.prezzo)}</p>
+                        <button
+                          onClick={() => toggleProdotto(p)}
+                          className={`w-full mt-2 text-[10px] font-bold py-1.5 rounded-lg transition-colors ${isAdded ? 'bg-slate-900 text-white' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+                        >
+                          {isAdded ? '✓ Aggiunto' : '+ Aggiungi'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* riepilogo sticky */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 lg:sticky lg:top-6">
+            <p className="text-sm font-semibold text-slate-900 mb-1">Riepilogo</p>
+            <p className="text-xs text-slate-400 mb-4">{carrello.length} {carrello.length === 1 ? 'voce' : 'voci'} aggiunte</p>
+
+            <div className="space-y-2 max-h-[280px] overflow-y-auto mb-4">
+              {carrello.length === 0 && (
+                <p className="text-xs text-slate-400 text-center py-6">Aggiungi materiali o prodotti per iniziare.</p>
+              )}
+              {carrello.map(item => {
+                const zonaInfo = ZONE_AMBIENTI.find(z => z.id === (item.zona || 'generico'));
+                return (
+                <div key={item.id} className="flex items-center justify-between gap-2 bg-slate-50 rounded-lg px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-xs font-medium text-slate-900 truncate">{item.nome}</p>
+                      {zonaInfo && <span className="text-[9px] shrink-0" title={zonaInfo.nome}>{zonaInfo.icon}</span>}
+                    </div>
+                    <p className="text-[10px] text-slate-400 truncate">{item.meta}</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="text-xs font-bold text-slate-900">{fmtEuro(Math.round(item.prezzoUnitario * item.qty))}</span>
+                    <button onClick={() => rimuoviVoce(item.id)} className="text-slate-300 hover:text-red-500"><X className="w-3 h-3" /></button>
+                  </div>
+                </div>
+                );
+              })}
+            </div>
+
+            <div className="border-t border-slate-100 pt-3 flex items-center justify-between mb-4">
+              <span className="text-sm font-semibold text-slate-500">Totale</span>
+              <span className="text-xl font-bold text-slate-900">{fmtEuro(Math.round(totale))}</span>
+            </div>
+
+            <button
+              onClick={() => setShowPreview(true)}
+              disabled={carrello.length === 0 || fotoCantiere.length < 2}
+              className="w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+            >
+              <FileText className="w-4 h-4" />
+              Anteprima Documento
+            </button>
+            {carrello.length > 0 && fotoCantiere.length < 2 && (
+              <p className="text-[11px] text-amber-600 text-center mt-2">Servono almeno 2 foto del cantiere per procedere</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* anteprima documento — fedele allo stile del preventivo reale */}
+      {showPreview && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowPreview(false)}></div>
+          <div className="relative bg-white rounded-t-2xl sm:rounded-2xl max-w-lg w-full max-h-[92vh] flex flex-col overflow-hidden">
+
+            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <p className="text-sm font-semibold text-slate-900">Anteprima documento</p>
+              <button onClick={() => setShowPreview(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* toggle Interno / Cliente */}
+            <div className="px-5 pt-3.5 pb-3 shrink-0">
+              <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
+                <button
+                  onClick={() => setPreviewView('interno')}
+                  className={`flex-1 text-xs font-bold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-1.5 ${previewView === 'interno' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}
+                >
+                  <Wrench className="w-3.5 h-3.5" />
+                  Per te e la tua squadra
+                </button>
+                <button
+                  onClick={() => setPreviewView('cliente')}
+                  className={`flex-1 text-xs font-bold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-1.5 ${previewView === 'cliente' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  Per il Cliente
+                </button>
+              </div>
+              <p className="text-[10.5px] text-slate-400 text-center mt-2 leading-snug">
+                {previewView === 'interno'
+                  ? 'Lista materiali con prezzi unitari, per ordinare la merce.'
+                  : 'Quello che vede il cliente: lavori a blocchi, nessun prezzo unitario.'}
+              </p>
+            </div>
+
+            <div className="overflow-y-auto px-5 pb-5">
+
+              {/* ============ VISTA INTERNA — per te e la tua squadra ============ */}
+              {previewView === 'interno' && (
+                <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                  <div className="bg-slate-900 px-5 py-3.5 flex items-center justify-between">
+                    <p className="text-white text-xs font-bold uppercase tracking-wide">Lista materiali da ordinare</p>
+                    <span className="text-[10px] text-slate-400 font-mono">uso interno</span>
+                  </div>
+
+                  <div className="px-5 py-2">
+                    {carrello.length === 0 && (
+                      <p className="text-sm text-slate-400 text-center py-6">Nessuna voce ancora aggiunta.</p>
+                    )}
+                    {carrello.map(item => (
+                      <div key={item.id} className="flex items-center justify-between gap-3 py-2.5 border-b border-slate-50 last:border-0">
+                        <div className="min-w-0">
+                          <p className="text-[12.5px] font-semibold text-slate-900 truncate">{item.nome}</p>
+                          <p className="text-[10.5px] text-slate-400 truncate">{item.meta}</p>
+                        </div>
+                        <span className="font-mono text-[12.5px] font-bold text-slate-900 shrink-0">{fmtEuro(Math.round(item.prezzoUnitario * item.qty))}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="px-5 py-3 flex items-center justify-between border-t border-slate-100">
+                    <span className="text-xs font-semibold text-slate-500">Subtotale materiali</span>
+                    <span className="font-mono text-sm font-bold text-slate-900">{fmtEuro(Math.round(subtotaleMateriali + subtotaleProdotti))}</span>
+                  </div>
+                  <div className="px-5 py-3 flex items-center justify-between border-t border-slate-100">
+                    <span className="text-xs font-semibold text-slate-500">
+                      Manodopera {rincaroMode === 'percent' ? `(${rincaroPercent}%)` : `(${rincaroOre}h × ${rincaroTariffa}€)`}
+                    </span>
+                    <span className="font-mono text-sm font-bold text-slate-900">{fmtEuro(Math.round(rincaroValore))}</span>
+                  </div>
+                  <div className="bg-slate-900 px-5 py-4 flex items-center justify-between">
+                    <span className="text-sm font-semibold text-slate-300">Totale reale</span>
+                    <span className="text-xl font-extrabold text-white">{fmtEuro(Math.round(totale))}</span>
+                  </div>
+
+                  <div className="bg-amber-50 border-t border-amber-100 px-5 py-3">
+                    <p className="text-[10.5px] text-amber-700 leading-relaxed">
+                      Questa vista non va mai inviata al cliente: serve solo a te e alla tua squadra per gli ordini.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* ============ VISTA CLIENTE — fedele al preventivo reale ============ */}
+              {previewView === 'cliente' && (
+                <div className="border border-slate-200 rounded-2xl overflow-hidden">
+
+                  <div className="bg-[#10133a] px-6 pt-7 pb-10 rounded-b-[40%] flex items-center gap-3">
+                    <img src={LOGO_BASE64} alt="Ferari Impianti" className="w-14 h-14 rounded-xl shrink-0" />
+                    <p className="text-white text-lg font-bold tracking-tight">PREVENTIVO</p>
+                  </div>
+
+                  <div className="px-6 -mt-5">
+                    <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex items-center justify-between shadow-sm">
+                      <div>
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Data preventivo</p>
+                        <p className="text-sm font-bold text-slate-900 mt-0.5">{dataDocumento}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Numero</p>
+                        <p className="text-sm font-bold text-slate-900 mt-0.5">{numeroDocumento}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="px-6 pt-5 pb-2">
+                    <div className="bg-[#10133a] text-white text-xs font-bold px-3 py-2 rounded-lg uppercase tracking-wide">
+                      Disegnazione lavori
+                    </div>
+                  </div>
+
+                  <div className="px-6 pb-5 space-y-4">
+                    {ZONE_AMBIENTI.filter(z => carrello.some(i => (i.zona || 'generico') === z.id)).map(zona => {
+                      const vociZona = carrello.filter(i => (i.zona || 'generico') === zona.id);
+                      const mat = vociZona.filter(i => i.kind === 'materiale');
+                      const prod = vociZona.filter(i => i.kind === 'prodotto');
+                      return (
+                        <div key={zona.id}>
+                          <p className="text-[12.5px] font-bold text-slate-900 uppercase flex items-center gap-1.5">
+                            <span>{zona.icon}</span>{zona.nome}
+                          </p>
+                          <ul className="mt-1.5 space-y-1">
+                            {mat.map(item => (
+                              <li key={item.id} className="text-[11.5px] text-slate-600 flex gap-1.5">
+                                <span className="text-slate-300">•</span>
+                                <span>Fornitura e posa in opera di {item.nome.toLowerCase()}.</span>
+                              </li>
+                            ))}
+                            {prod.map(item => (
+                              <li key={item.id} className="text-[11.5px] text-slate-600 flex gap-1.5">
+                                <span className="text-slate-300">•</span>
+                                <span>Fornitura e installazione: {item.nome} ({item.meta}).</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      );
+                    })}
+                    {rincaroValore > 0 && (
+                      <p className="text-[11.5px] text-slate-500 italic">
+                        Manodopera e collaudo finale inclusi nel totale.
+                      </p>
+                    )}
+                    {carrello.length === 0 && (
+                      <p className="text-sm text-slate-400 text-center py-4">Nessuna voce ancora aggiunta.</p>
+                    )}
+                    {fotoCantiere.length > 0 && (
+                      <div className="pt-2 border-t border-slate-100">
+                        <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-2">Documentazione fotografica ({fotoCantiere.length})</p>
+                        <div className="grid grid-cols-6 gap-1.5">
+                          {fotoCantiere.slice(0, 6).map(f => (
+                            <div key={f.id} className="aspect-square rounded-md overflow-hidden border border-slate-100">
+                              <img src={f.dataUrl} alt="" className="w-full h-full object-cover" />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="px-6 pb-2">
+                    <p className="text-[10px] font-semibold text-slate-400 text-center uppercase tracking-wide">IVA non esposta</p>
+                  </div>
+                  <div className="px-6 pb-5">
+                    <div className="bg-[#10133a] text-white rounded-xl px-5 py-4 flex items-center justify-between">
+                      <span className="text-sm font-semibold">Totale</span>
+                      <span className="text-2xl font-extrabold">{fmtEuro(Math.round(totale))}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 text-center mt-2">Il totale comprende materiale e manodopera</p>
+                  </div>
+
+                  <div className="bg-slate-50 border-t border-slate-100 px-6 py-3">
+                    <p className="text-[9.5px] text-slate-400 text-center leading-relaxed">
+                      Preventivo valido per 10 giorni dalla data di emissione, a causa di variazioni dei costi del materiale.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-5 py-4 border-t border-slate-100 shrink-0">
+              <div className="flex gap-2.5 mb-2.5">
+                {/* PDF per il Cliente */}
+                <button
+                  onClick={async () => {
+                    const maxNum = Math.max(...preventivi.map(p => parseInt(p.id.replace('PV-',''))||0), 148);
+                    await generaPDFCliente({
+                      cliente,
+                      carrello,
+                      rincaro: rincaroValore,
+                      totale,
+                      nextId: 'PV-' + String(maxNum+1).padStart(4,'0'),
+                      logoB64: LOGO_BASE64,
+                    });
+                  }}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  PDF per il Cliente
+                </button>
+                {/* PDF Interno Firma */}
+                <button
+                  onClick={async () => {
+                    const maxNum2 = Math.max(...preventivi.map(p => parseInt(p.id.replace('PV-',''))||0), 148);
+                    await generaPDFInterno({
+                      cliente,
+                      carrello,
+                      subMat: carrello.filter(i=>i.kind==='materiale').reduce((s,i)=>s+i.prezzoUnitario*i.qty,0),
+                      subProd: carrello.filter(i=>i.kind==='prodotto').reduce((s,i)=>s+i.prezzoUnitario*i.qty,0),
+                      rincaro: rincaroValore,
+                      totale,
+                      rincaroMode,
+                      rPct: rincaroPercent,
+                      rOre: rincaroOre,
+                      rTar: rincaroTariffa,
+                      nextId: 'PV-' + String(maxNum2+1).padStart(4,'0'),
+                    });
+                  }}
+                  className="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  PDF Interno Firma
+                </button>
+              </div>
+              <button
+                onClick={salvaPreventivo}
+                className="w-full border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-semibold py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
+              >
+                <Check className="w-4 h-4 text-emerald-500" />
+                Salva preventivo nella lista
+              </button>
+              <button onClick={() => setShowPreview(false)} className="w-full text-slate-400 text-xs py-2 mt-1">
+                ← Modifica
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* success modal */}
+      {showSuccess && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+          <div className="absolute inset-0 bg-black/50" onClick={chiudiSuccess}></div>
+          <div className="relative bg-white rounded-2xl p-6 max-w-sm w-full">
+            <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center mb-4">
+              <Check className="w-6 h-6 text-emerald-600" />
+            </div>
+            <p className="text-base font-bold text-slate-900">Preventivo salvato</p>
+            <p className="text-sm text-slate-500 mt-2 leading-relaxed">
+              Il preventivo per <strong>{cliente?.nome}</strong> è stato salvato nella lista. Puoi scaricare i PDF dall'anteprima documento.
+            </p>
+            <div className="flex items-center justify-between border-t border-slate-100 mt-4 pt-4">
+              <span className="text-xs font-semibold text-slate-400">Totale</span>
+              <span className="text-base font-bold text-emerald-600">{fmtEuro(Math.round(totale))}</span>
+            </div>
+            <button onClick={chiudiSuccess} className="w-full mt-5 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold py-3 rounded-xl transition-colors">
+              Vai alla lista preventivi
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
+/* ============================================================ */
+/* PAGINA MATERIALI — listino personale, cresce nel tempo         */
+/* ============================================================ */
+
+function MaterialiPage({ materiali, setMateriali }) {
+  const [editingId, setEditingId] = useState(null);
+  const [editValue, setEditValue] = useState('');
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [newNome, setNewNome] = useState('');
+  const [newUnita, setNewUnita] = useState('m');
+  const [newPrezzo, setNewPrezzo] = useState('');
+  const [savedFlashId, setSavedFlashId] = useState(null);
+
+  const oggi = () => {
+    const d = new Date();
+    return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
+  };
+
+  const startEdit = (m) => {
+    setEditingId(m.id);
+    setEditValue(String(m.prezzo).replace('.', ','));
+  };
+
+  const confirmEdit = (id) => {
+    const val = parseFloat(editValue.replace(',', '.'));
+    if (!isNaN(val) && val > 0) {
+      setMateriali(materiali.map(m => m.id === id ? { ...m, prezzo: val, ultimoAggiornamento: oggi() } : m));
+      setSavedFlashId(id);
+      setTimeout(() => setSavedFlashId(null), 1800);
+    }
+    setEditingId(null);
+  };
+
+  const deleteMateriale = (id) => {
+    setMateriali(materiali.filter(m => m.id !== id));
+  };
+
+  const addMateriale = () => {
+    if (!newNome.trim()) return;
+    const prezzo = parseFloat((newPrezzo || '0').replace(',', '.')) || 0;
+    const newItem = {
+      id: 'm' + Date.now(),
+      nome: newNome.trim(),
+      unita: newUnita,
+      prezzo,
+      ultimoAggiornamento: oggi(),
+    };
+    setMateriali([newItem, ...materiali]);
+    setNewNome('');
+    setNewUnita('m');
+    setNewPrezzo('');
+    setShowNewForm(false);
+  };
+
+  return (
+    <div className="px-8 py-6 space-y-5">
+
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900">Materiali grezzi</h2>
+            <p className="text-xs text-slate-400 mt-0.5">{materiali.length} voci nel listino</p>
+          </div>
+          <button
+            onClick={() => setShowNewForm(!showNewForm)}
+            className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Nuovo materiale
+          </button>
+        </div>
+
+        {showNewForm && (
+          <div className="px-5 py-4 bg-slate-50 border-b border-slate-100">
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_auto] gap-2.5 items-end">
+              <div>
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">Nome materiale</label>
+                <input
+                  type="text"
+                  value={newNome}
+                  onChange={(e) => setNewNome(e.target.value)}
+                  placeholder="Es. Tubo in rame 14mm"
+                  className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">Unità</label>
+                <select
+                  value={newUnita}
+                  onChange={(e) => setNewUnita(e.target.value)}
+                  className="px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                >
+                  <option value="m">al metro (m)</option>
+                  <option value="pz">a pezzo (pz)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">Prezzo €</label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={newPrezzo}
+                  onChange={(e) => setNewPrezzo(e.target.value)}
+                  placeholder="0,00"
+                  className="w-24 px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={addMateriale}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                >
+                  Aggiungi
+                </button>
+                <button
+                  onClick={() => setShowNewForm(false)}
+                  className="px-3 py-2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100">
+                <th className="text-left font-medium text-slate-500 text-xs px-5 py-3">Materiale</th>
+                <th className="text-left font-medium text-slate-500 text-xs px-5 py-3">Unità</th>
+                <th className="text-left font-medium text-slate-500 text-xs px-5 py-3 hidden sm:table-cell">Aggiornato</th>
+                <th className="text-right font-medium text-slate-500 text-xs px-5 py-3">Prezzo</th>
+                <th className="px-5 py-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {materiali.map((m) => (
+                <tr key={m.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60 transition-colors">
+                  <td className="px-5 py-3.5 font-medium text-slate-900">{m.nome}</td>
+                  <td className="px-5 py-3.5 text-slate-500 font-mono text-xs">{m.unita}</td>
+                  <td className="px-5 py-3.5 text-slate-400 text-xs hidden sm:table-cell">{m.ultimoAggiornamento}</td>
+                  <td className="px-5 py-3.5 text-right">
+                    {editingId === m.id ? (
+                      <div className="flex items-center justify-end gap-1.5">
+                        <span className="text-slate-400 text-xs">€</span>
+                        <input
+                          autoFocus
+                          type="text"
+                          inputMode="decimal"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && confirmEdit(m.id)}
+                          className="w-20 px-2 py-1 text-sm text-right bg-white border border-blue-300 rounded-md outline-none focus:ring-2 focus:ring-blue-500/30"
+                        />
+                        <button onClick={() => confirmEdit(m.id)} className="text-emerald-600 hover:text-emerald-700">
+                          <Check className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => startEdit(m)}
+                        className={`font-semibold transition-colors rounded-md px-2 py-1 ${
+                          savedFlashId === m.id ? 'bg-emerald-50 text-emerald-700' : 'text-slate-900 hover:bg-slate-100'
+                        }`}
+                      >
+                        {m.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €
+                      </button>
+                    )}
+                  </td>
+                  <td className="px-5 py-3.5 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <button onClick={() => startEdit(m)} className="text-slate-400 hover:text-slate-600 p-1">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => deleteMateriale(m.id)} className="text-slate-400 hover:text-red-500 p-1">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {materiali.length === 0 && (
+                <tr>
+                  <td colSpan="5" className="px-5 py-10 text-center text-sm text-slate-400">
+                    Nessun materiale ancora. Aggiungine uno per iniziare il tuo listino.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================ */
+/* PAGINA CATALOGO PRODOTTI — finiture premium, organizzate       */
+/* ============================================================ */
+
+function CatalogoPage({ prodotti, setProdotti }) {
+  const [activeCat, setActiveCat] = useState('Caldaie & Clima');
+  const [activeSub, setActiveSub] = useState('Tutte');
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [newNome, setNewNome] = useState('');
+  const [newSub, setNewSub] = useState('');
+  const [newTier, setNewTier] = useState('Standard');
+  const [newPrezzo, setNewPrezzo] = useState('');
+  const [importMsg, setImportMsg] = useState(null); // { tipo, testo }
+  const [importing, setImporting] = useState(false);
+
+  const sottocategorie = ['Tutte', ...new Set(prodotti.filter(p => p.categoria === activeCat).map(p => p.sottocategoria).filter(Boolean))];
+  const filtered = prodotti.filter(p => p.categoria === activeCat && (activeSub === 'Tutte' || p.sottocategoria === activeSub));
+
+  const addProdotto = () => {
+    if (!newNome.trim()) return;
+    const prezzo = parseFloat((newPrezzo || '0').replace(',', '.')) || 0;
+    setProdotti([{ id: 'p' + Date.now(), nome: newNome.trim(), categoria: activeCat, sottocategoria: newSub.trim() || 'Generico', tier: newTier, prezzo }, ...prodotti]);
+    setNewNome('');
+    setNewSub('');
+    setNewTier('Standard');
+    setNewPrezzo('');
+    setShowNewForm(false);
+  };
+
+  const deleteProdotto = (id) => setProdotti(prodotti.filter(p => p.id !== id));
+
+  // Import listino fornitore — legge un CSV/Excel esportato dall'area riservata
+  // del fornitore (Tecnomat, Deghi, IDM...) e aggiunge i prodotti al catalogo.
+  // il proprietario lo fa da solo, senza dover chiamare nessuno.
+  const importaCatalogo = (file) => {
+    if (!file) return;
+    setImporting(true);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const testo = e.target.result;
+        const righe = testo.split('\n').map(r => r.trim()).filter(Boolean);
+        // formato atteso: Nome,Categoria,Sottocategoria,Tier,Prezzo
+        const nuovi = righe.slice(1).map((riga, idx) => {
+          const cols = riga.split(',').map(c => c.trim());
+          return {
+            id: 'imp' + Date.now() + idx,
+            nome: cols[0] || 'Prodotto importato',
+            categoria: cols[1] || activeCat,
+            sottocategoria: cols[2] || 'Generico',
+            tier: cols[3] || 'Standard',
+            prezzo: parseFloat(cols[4]) || 0,
+          };
+        }).filter(p => p.nome !== 'Prodotto importato' || righe.length > 1);
+
+        if (nuovi.length > 0) {
+          setProdotti(prev => [...nuovi, ...prev]);
+          setImportMsg({ tipo: 'ok', testo: `${nuovi.length} prodotti importati dal listino.` });
+        } else {
+          setImportMsg({ tipo: 'err', testo: 'Il file non contiene righe valide. Usa il formato: Nome,Categoria,Sottocategoria,Qualità,Prezzo' });
+        }
+      } catch (err) {
+        setImportMsg({ tipo: 'err', testo: 'Non sono riuscito a leggere il file. Controlla il formato ed riprova.' });
+      }
+      setImporting(false);
+      setTimeout(() => setImportMsg(null), 5000);
+    };
+    reader.readAsText(file);
+  };
+
+  return (
+    <div className="px-8 py-6 space-y-5">
+
+      {/* Aggiorna catalogo — import autonomo del listino fornitore */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-start gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+            <Download className="w-[18px] h-[18px] text-blue-600" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-900">Aggiorna catalogo dal fornitore</p>
+            <p className="text-xs text-slate-400 mt-0.5">File CSV esportato dall'area riservata del fornitore</p>
+          </div>
+        </div>
+        <label className={`shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2.5 rounded-lg cursor-pointer transition-colors ${importing ? 'bg-slate-100 text-slate-400' : 'bg-slate-900 hover:bg-slate-800 text-white'}`}>
+          {importing ? 'Importazione...' : 'Carica listino'}
+          <input
+            type="file"
+            accept=".csv,.txt"
+            className="hidden"
+            disabled={importing}
+            onChange={(e) => { if (e.target.files[0]) importaCatalogo(e.target.files[0]); e.target.value = ''; }}
+          />
+        </label>
+      </div>
+      {importMsg && (
+        <div className={`px-4 py-2.5 rounded-lg text-xs font-semibold ${importMsg.tipo === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+          {importMsg.testo}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex gap-1.5 bg-white border border-slate-200 rounded-xl p-1 overflow-x-auto">
+          {categorieCatalogo.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => { setActiveCat(cat); setActiveSub('Tutte'); }}
+              className={`px-3.5 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
+                activeCat === cat ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => setShowNewForm(!showNewForm)}
+          className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Nuovo prodotto
+        </button>
+      </div>
+
+      {/* sottocategorie della categoria attiva — filtro rapido richiesto dal cliente */}
+      {sottocategorie.length > 1 && (
+        <div className="flex flex-wrap gap-1.5">
+          {sottocategorie.map(sub => (
+            <button
+              key={sub}
+              onClick={() => setActiveSub(sub)}
+              className={`px-3 py-1.5 rounded-full text-[11px] font-semibold transition-colors ${
+                activeSub === sub ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              }`}
+            >
+              {sub}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {showNewForm && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-4">
+          <p className="text-xs font-semibold text-slate-500 mb-3">Nuovo prodotto in "{activeCat}"</p>
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto_auto_auto] gap-2.5 items-end">
+            <div>
+              <label className="block text-[11px] font-medium text-slate-500 mb-1">Nome prodotto</label>
+              <input
+                type="text"
+                value={newNome}
+                onChange={(e) => setNewNome(e.target.value)}
+                placeholder="Es. Caldaia Vaillant 28kW"
+                className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-slate-500 mb-1">Sottocategoria</label>
+              <input
+                type="text"
+                value={newSub}
+                onChange={(e) => setNewSub(e.target.value)}
+                placeholder="Es. Filo muro"
+                className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-slate-500 mb-1">Qualità</label>
+              <select
+                value={newTier}
+                onChange={(e) => setNewTier(e.target.value)}
+                className="px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+              >
+                <option>Standard</option>
+                <option>Premium</option>
+                <option>Lusso</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-slate-500 mb-1">Prezzo €</label>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={newPrezzo}
+                onChange={(e) => setNewPrezzo(e.target.value)}
+                placeholder="0,00"
+                className="w-24 px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={addProdotto} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors">
+                Aggiungi
+              </button>
+              <button onClick={() => setShowNewForm(false)} className="px-3 py-2 text-slate-400 hover:text-slate-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filtered.map((p) => (
+          <div key={p.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden group">
+            <div className="h-28 bg-slate-50 flex flex-col items-center justify-center gap-1.5 relative">
+              <ImagePlus className="w-5 h-5 text-slate-300" />
+              <span className="text-[10.5px] font-medium text-slate-400">Foto da aggiungere</span>
+              <span className={`absolute top-2 left-2 text-[10px] font-semibold px-2 py-1 rounded-full ${tierStyle[p.tier]}`}>
+                {p.tier}
+              </span>
+              <button
+                onClick={() => deleteProdotto(p.id)}
+                className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/90 text-slate-400 hover:text-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="p-3.5">
+              {p.sottocategoria && <p className="text-[10px] font-semibold text-blue-500 uppercase tracking-wide mb-1">{p.sottocategoria}</p>}
+              <p className="text-[13px] font-semibold text-slate-900 leading-snug min-h-[34px]">{p.nome}</p>
+              <p className="text-base font-bold text-slate-900 mt-1.5">{fmtEuro(p.prezzo)}</p>
+            </div>
+          </div>
+        ))}
+        {filtered.length === 0 && (
+          <div className="sm:col-span-2 lg:col-span-3 bg-white border border-slate-200 rounded-2xl py-14 flex flex-col items-center justify-center text-center">
+            <ShoppingBag className="w-7 h-7 text-slate-300 mb-2" />
+            <p className="text-sm text-slate-400">Nessun prodotto in questa categoria.</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================ */
+/* VISTA SQUADRA — l'amministratore vede da qui cosa vedrebbe la squadra:  */
+/* solo materiali e lavorazioni per zona, senza prezzi. Nessun   */
+/* login separato per ora, ma la struttura è già predisposta.    */
+/* ============================================================ */
+function SquadraPage({ preventivi, clienti }) {
+  const lavoriAttivi = preventivi.filter(p => p.stato === 'In Attesa' || p.stato === 'Accettato');
+
+  return (
+    <div className="px-8 py-6 space-y-5">
+      {lavoriAttivi.length === 0 ? (
+        <div className="bg-white border border-slate-200 rounded-2xl py-16 flex flex-col items-center justify-center text-center">
+          <Wrench className="w-7 h-7 text-slate-300 mb-2" />
+          <p className="text-sm text-slate-400">Nessun lavoro attivo al momento.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {lavoriAttivi.map(p => {
+            const cliente = clienti.find(c => c.id === p.clienteId);
+            const zone = p.zone || [];
+            const carrelloSnap = p.carrelloSnapshot || [];
+            return (
+              <div key={p.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+                <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">{p.cantiere}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{cliente?.nome || p.cliente}</p>
+                  </div>
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-medium ${statoStyle[p.stato]}`}>{p.stato}</span>
+                </div>
+                <div className="p-4 space-y-3">
+                  {zone.length > 0 ? (
+                    zone.map(zonaId => {
+                      const zonaInfo = ZONE_AMBIENTI.find(z => z.id === zonaId);
+                      const vociZona = carrelloSnap.filter(i => (i.zona || 'generico') === zonaId);
+                      return (
+                        <div key={zonaId}>
+                          <p className="text-xs font-bold text-slate-700 flex items-center gap-1.5 mb-1">
+                            <span>{zonaInfo?.icon}</span>{zonaInfo?.nome || zonaId}
+                          </p>
+                          <ul className="space-y-0.5 pl-1">
+                            {vociZona.map(v => (
+                              <li key={v.id} className="text-xs text-slate-500 flex items-center gap-1.5">
+                                <span className="text-slate-300">•</span>
+                                {v.nome} <span className="text-slate-400 font-mono">({v.qty})</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-xs text-slate-400">Nessuna zona specificata per questo preventivo.</p>
+                  )}
+                  {p.nFoto > 0 && (
+                    <p className="text-[11px] text-slate-400 flex items-center gap-1.5 pt-1 border-t border-slate-50">
+                      <ImagePlus className="w-3 h-3" /> {p.nFoto} foto cantiere archiviate
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+
+const pageConfig = {
+  dashboard: { title: 'Dashboard', subtitle: null },
+  preventivi: { title: 'Preventivi', subtitle: null },
+  clienti: { title: 'Clienti', subtitle: null },
+  materiali: { title: 'Materiali', subtitle: null },
+  catalogo: { title: 'Catalogo', subtitle: null },
+  squadra: { title: 'Lavori Squadra', subtitle: null },
+};
+
+function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentPage, setCurrentPage] = useState('dashboard');
+
+  // stato centrale: tutta l'app legge e scrive da qui
+  const [clienti, setClienti] = useState(clientiIniziali);
+  const [materiali, setMateriali] = useState(materialiIniziali);
+  const [prodotti, setProdotti] = useState(catalogoIniziale);
+  const [preventivi, setPreventivi] = useState(preventiviRecenti);
+  const [presetClienteId, setPresetClienteId] = useState(null);
+
+  if (!isLoggedIn) {
+    return <LoginPage onLogin={() => setIsLoggedIn(true)} />;
+  }
+
+  const { title, subtitle } = pageConfig[currentPage];
+
+  const handleNuovoPreventivo = (clienteId) => {
+    setPresetClienteId(clienteId);
+    setCurrentPage('preventivi');
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex">
+      <Sidebar
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+        onLogout={() => setIsLoggedIn(false)}
+      />
+
+      <div className="flex-1 min-w-0">
+        <TopBar title={title} subtitle={subtitle} />
+
+        {currentPage === 'dashboard' && (
+          <DashboardPage preventivi={preventivi} clienti={clienti} onVediTutti={() => setCurrentPage('preventivi')} />
+        )}
+        {currentPage === 'preventivi' && (
+          <PreventiviPage
+            clienti={clienti}
+            setClienti={setClienti}
+            preventivi={preventivi}
+            setPreventivi={setPreventivi}
+            materiali={materiali}
+            setMateriali={setMateriali}
+            prodotti={prodotti}
+            presetClienteId={presetClienteId}
+            onConsumePreset={() => setPresetClienteId(null)}
+          />
+        )}
+        {currentPage === 'clienti' && (
+          <ClientiPage
+            clienti={clienti}
+            setClienti={setClienti}
+            preventivi={preventivi}
+            onNuovoPreventivo={handleNuovoPreventivo}
+          />
+        )}
+        {currentPage === 'materiali' && <MaterialiPage materiali={materiali} setMateriali={setMateriali} />}
+        {currentPage === 'catalogo' && <CatalogoPage prodotti={prodotti} setProdotti={setProdotti} />}
+        {currentPage === 'squadra' && <SquadraPage preventivi={preventivi} clienti={clienti} />}
+      </div>
+    </div>
+  );
+}
+
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>
