@@ -1735,6 +1735,8 @@ function TopBar({ title, subtitle, onMenuClick }) {
           <div className="flex items-center gap-2.5 min-w-0">
             <img src={LOGO_BASE64} alt="" className="w-8 h-8 rounded-lg shrink-0 ring-1 ring-white/10" />
             <span className="text-sm font-semibold text-white/90 truncate">Ferari Impianti</span>
+            {/* marcatore temporaneo di verifica versione — da togliere dopo conferma */}
+            <span className="text-[9px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full shrink-0">BUILD-30</span>
           </div>
           <button type="button" onClick={onMenuClick} className="w-10 h-10 rounded-full bg-white/10 active:bg-white/20 flex items-center justify-center shrink-0" aria-label="Menu">
             <Menu className="w-5 h-5 text-white" />
