@@ -36,10 +36,14 @@
             white-space:pre-wrap; }
   .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .app-scroll { -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+  /* NB: niente "transform" qui — un transform (anche via animazione, anche
+     a 0) crea un nuovo containing block e rompe TUTTI gli elementi
+     "position: fixed" annidati dentro (bottone +, modali a schermo intero),
+     che smettono di ancorarsi allo schermo e si ancorano a questo div */
   .app-page { animation: appEnter 0.24s ease-out both; }
   @keyframes appEnter {
-    from { opacity: 0; transform: translateY(8px); }
-    to { opacity: 1; transform: translateY(0); }
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
   .app-card {
     background: #fff;
@@ -51,6 +55,13 @@
   }
   .app-input {
     font-size: 16px;
+  }
+  /* sotto i 16px, Safari su iPhone/iPad zooma la pagina ogni volta che tocchi
+     un campo — fa sembrare tutto un sito web invece di un'app. Vince su
+     text-sm/text-xs di Tailwind perché altrimenti quelle classi (più
+     specifiche di un selettore per tag) avrebbero la meglio. */
+  input, select, textarea {
+    font-size: 16px !important;
   }
 </style>
 </head>
@@ -1561,7 +1572,7 @@ function Sidebar({ currentPage, setCurrentPage, onLogout, mobileOpen, onMobileCl
         <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={onMobileClose} aria-hidden="true" />
       )}
       <aside className={`fixed lg:sticky top-0 z-50 lg:z-auto w-[min(18rem,88vw)] lg:w-64 bg-white border-r border-slate-200 flex flex-col h-[100dvh] shrink-0 transition-transform duration-200 ease-out ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
-        <div className="px-5 py-5 border-b border-slate-100 flex items-center justify-between gap-3">
+        <div className="px-5 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] border-b border-slate-100 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <img src={LOGO_BASE64} alt="Ferari Impianti" className="w-9 h-9 rounded-lg shrink-0" />
             <div className="leading-tight min-w-0">
@@ -2029,7 +2040,7 @@ function ClientiPage({ clienti, setClienti, clientiLoading, preventivi, onNuovoP
     if (!selected) return;
     const { error } = await sb.from('clienti').update(clienteToRow(gps)).eq('id', selected.id);
     if (error) {
-      alert('Errore nel salvare la posizione: ' + error.message);
+      mostraToast('Errore nel salvare la posizione: ' + error.message);
       return;
     }
     setClienti(clienti.map(c => c.id === selected.id ? { ...c, ...gps } : c));
@@ -2071,7 +2082,7 @@ function ClientiPage({ clienti, setClienti, clientiLoading, preventivi, onNuovoP
     const nuoveNote = [...selected.note, { text: noteInput.trim(), data }];
     const { error } = await sb.from('clienti').update({ note: nuoveNote }).eq('id', selected.id);
     if (error) {
-      alert('Errore nel salvare la nota: ' + error.message);
+      mostraToast('Errore nel salvare la nota: ' + error.message);
       return;
     }
     setClienti(clienti.map(c => c.id === selected.id ? { ...c, note: nuoveNote } : c));
@@ -2813,7 +2824,7 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
         .update({ prezzo: valore, ultimo_aggiornamento: new Date().toISOString() })
         .eq('id', matId);
       if (error) {
-        alert('Errore nel salvare il prezzo: ' + error.message);
+        mostraToast('Errore nel salvare il prezzo: ' + error.message);
         return;
       }
     }
@@ -2960,7 +2971,7 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
       try {
         blob = await comprimiImmagine(file, 1280, 0.6);
       } catch (err) {
-        alert('Errore nel comprimere la foto: ' + err.message);
+        mostraToast('Errore nel comprimere la foto: ' + err.message);
         continue;
       }
       try {
@@ -2999,7 +3010,7 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
   const cambiaStato = async (id, nuovoStato) => {
     const { error } = await sb.from('preventivi').update({ stato: nuovoStato }).eq('numero', id);
     if (error) {
-      alert('Errore nel salvare lo stato: ' + error.message);
+      mostraToast('Errore nel salvare lo stato: ' + error.message);
       return;
     }
     setPreventivi(preventivi.map(p => p.id === id ? { ...p, stato: nuovoStato } : p));
@@ -4098,7 +4109,7 @@ function MaterialiPage({ materiali, setMateriali, materialiLoading }) {
       .update({ prezzo: val, ultimo_aggiornamento: new Date().toISOString() })
       .eq('id', id);
     if (error) {
-      alert('Errore nel salvare il prezzo: ' + error.message);
+      mostraToast('Errore nel salvare il prezzo: ' + error.message);
       return;
     }
     setMateriali(materiali.map(m => m.id === id ? { ...m, prezzo: val, ultimoAggiornamento: oggi() } : m));
@@ -4118,7 +4129,7 @@ function MaterialiPage({ materiali, setMateriali, materialiLoading }) {
     if (!nome || nome === originale) return;
     const { error } = await sb.from('materiali').update({ nome }).eq('id', id);
     if (error) {
-      alert('Errore nel salvare il nome: ' + error.message);
+      mostraToast('Errore nel salvare il nome: ' + error.message);
       return;
     }
     setMateriali(materiali.map(m => m.id === id ? { ...m, nome } : m));
@@ -4127,7 +4138,7 @@ function MaterialiPage({ materiali, setMateriali, materialiLoading }) {
   const aggiornaZonaMateriale = async (id, zona) => {
     const { error } = await sb.from('materiali').update({ zona: zona || null }).eq('id', id);
     if (error) {
-      alert('Errore nel salvare la zona: ' + error.message);
+      mostraToast('Errore nel salvare la zona: ' + error.message);
       return;
     }
     setMateriali(materiali.map(m => m.id === id ? { ...m, zona } : m));
@@ -4136,7 +4147,7 @@ function MaterialiPage({ materiali, setMateriali, materialiLoading }) {
   const deleteMateriale = async (id) => {
     const { error } = await sb.from('materiali').delete().eq('id', id);
     if (error) {
-      alert('Errore nell’eliminare il materiale: ' + error.message);
+      mostraToast('Errore nell’eliminare il materiale: ' + error.message);
       return;
     }
     setMateriali(materiali.filter(m => m.id !== id));
@@ -4235,7 +4246,85 @@ function MaterialiPage({ materiali, setMateriali, materialiLoading }) {
           </div>
         )}
 
-        <div className="overflow-x-auto">
+        {/* lista a card — su telefono una tabella non si sente mai come
+            un'app nativa, meglio righe verticali con tocchi larghi */}
+        <div className="lg:hidden divide-y divide-slate-50">
+          {materiali.map((m) => (
+            <div key={m.id} className="px-4 py-3.5 flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                {renamingId === m.id ? (
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      autoFocus
+                      type="text"
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && confirmRename(m.id)}
+                      onBlur={() => confirmRename(m.id)}
+                      className="w-full px-2 py-1.5 text-sm bg-white border border-blue-300 rounded-md outline-none focus:ring-2 focus:ring-blue-500/30"
+                    />
+                    <button onClick={() => confirmRename(m.id)} className="text-emerald-600 hover:text-emerald-700 shrink-0 p-1">
+                      <Check className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => startRename(m)} className="text-left text-sm font-medium text-slate-900 truncate block w-full py-1 -my-1">
+                    {m.nome}
+                  </button>
+                )}
+                <p className="text-xs text-slate-400 font-mono mt-1">
+                  {m.unita}{m.ultimoAggiornamento ? ` · ${m.ultimoAggiornamento}` : ''}
+                </p>
+                <select
+                  value={m.zona || ''}
+                  onChange={(e) => aggiornaZonaMateriale(m.id, e.target.value)}
+                  className="mt-2 w-full text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-md px-2 py-2 outline-none focus:ring-2 focus:ring-blue-500/30"
+                >
+                  <option value="">Tutte le zone</option>
+                  {ZONE_AMBIENTI.map(z => <option key={z.id} value={z.id}>{z.nome}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col items-end gap-2 shrink-0">
+                {editingId === m.id ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-slate-400 text-xs">€</span>
+                    <input
+                      autoFocus
+                      type="text"
+                      inputMode="decimal"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && confirmEdit(m.id)}
+                      className="w-16 px-2 py-1.5 text-sm text-right bg-white border border-blue-300 rounded-md outline-none focus:ring-2 focus:ring-blue-500/30"
+                    />
+                    <button onClick={() => confirmEdit(m.id)} className="text-emerald-600 hover:text-emerald-700 p-1">
+                      <Check className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => startEdit(m)}
+                    className={`font-semibold text-sm rounded-md px-2.5 py-1.5 transition-colors ${
+                      savedFlashId === m.id ? 'bg-emerald-50 text-emerald-700' : 'text-slate-900 bg-slate-50'
+                    }`}
+                  >
+                    {m.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €
+                  </button>
+                )}
+                <button onClick={() => deleteMateriale(m.id)} className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-red-500">
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+          {materiali.length === 0 && (
+            <p className="px-5 py-10 text-center text-sm text-slate-400">
+              {materialiLoading ? 'Caricamento materiali...' : 'Nessun materiale ancora. Aggiungine uno per iniziare il tuo listino.'}
+            </p>
+          )}
+        </div>
+
+        <div className="hidden lg:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100">
@@ -4422,7 +4511,7 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
   const deleteProdotto = async (id) => {
     const { error } = await sb.from('prodotti').delete().eq('id', id);
     if (error) {
-      alert('Errore nell’eliminare il prodotto: ' + error.message);
+      mostraToast('Errore nell’eliminare il prodotto: ' + error.message);
       return;
     }
     setProdotti(prodotti.filter(p => p.id !== id));
@@ -4437,7 +4526,7 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
   const aggiornaZonaProdotto = async (id, zona) => {
     const { error } = await sb.from('prodotti').update({ zona: zona || null }).eq('id', id);
     if (error) {
-      alert('Errore nel salvare la zona: ' + error.message);
+      mostraToast('Errore nel salvare la zona: ' + error.message);
       return;
     }
     setProdotti(prodotti.map(p => p.id === id ? { ...p, zona } : p));
@@ -4450,7 +4539,7 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
     if (!nome || isNaN(prezzo) || prezzo <= 0) return;
     const { error } = await sb.from('prodotti').update({ nome, prezzo }).eq('id', id);
     if (error) {
-      alert('Errore nel salvare le modifiche: ' + error.message);
+      mostraToast('Errore nel salvare le modifiche: ' + error.message);
       return;
     }
     setProdotti(prodotti.map(p => p.id === id ? { ...p, nome, prezzo } : p));
@@ -4471,7 +4560,7 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
       setProdotti(prev => prev.map(x => x.id === p.id ? { ...x, fotoPath: path, fotoUrl } : x));
       if (vecchioPath) sb.storage.from('prodotti-foto').remove([vecchioPath]).catch(() => {});
     } catch (err) {
-      alert('Errore nel caricare la foto: ' + err.message);
+      mostraToast('Errore nel caricare la foto: ' + err.message);
     }
     setCaricandoFotoId(null);
   };
@@ -4972,6 +5061,38 @@ const pageConfig = {
   squadra: { title: 'Lavori Squadra', subtitle: null },
 };
 
+// notifiche in-app al posto di alert() nativo — un popup del browser mostra
+// la barra degli indirizzi/i bottoni del sistema e rompe subito l'illusione
+// di app vera; questo resta dentro lo stile dell'app
+function mostraToast(messaggio, tipo = 'errore') {
+  window.dispatchEvent(new CustomEvent('ferari-toast', { detail: { messaggio, tipo } }));
+}
+
+function ToastHost() {
+  const [toast, setToast] = useState(null);
+  useEffect(() => {
+    let timer;
+    const onToast = (e) => {
+      setToast(e.detail);
+      clearTimeout(timer);
+      timer = setTimeout(() => setToast(null), 4500);
+    };
+    window.addEventListener('ferari-toast', onToast);
+    return () => { window.removeEventListener('ferari-toast', onToast); clearTimeout(timer); };
+  }, []);
+  if (!toast) return null;
+  return (
+    <div className="fixed inset-x-0 z-[100] px-4 flex justify-center bottom-[calc(5.5rem+env(safe-area-inset-bottom))] lg:bottom-6 pointer-events-none">
+      <div className={`pointer-events-auto w-full max-w-sm rounded-xl shadow-xl px-4 py-3 text-sm font-medium text-white flex items-start gap-3 ${toast.tipo === 'errore' ? 'bg-red-600' : 'bg-slate-900'}`}>
+        <span className="flex-1 leading-snug">{toast.messaggio}</span>
+        <button onClick={() => setToast(null)} className="shrink-0 opacity-80 hover:opacity-100">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   // sessione Supabase: undefined = verifica in corso, null = non loggato,
   // oggetto = loggato. Supabase la ricorda da solo tra un riavvio e l'altro.
@@ -5122,6 +5243,7 @@ function App() {
 
   return (
     <div className="h-[100dvh] flex bg-[#eef1f5] lg:bg-slate-50 overflow-hidden">
+      <ToastHost />
       <Sidebar
         currentPage={currentPage}
         setCurrentPage={goToPage}
