@@ -768,8 +768,37 @@ const LOGO_BASE64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAIAA
 // favicon / icona "aggiungi a schermata Home" -- usa il logo vero invece
 // dell'icona blu generica del browser (Android legge il manifest, iOS
 // legge apple-touch-icon; il manifest e' generato al volo come Blob per
-// restare in un unico file, senza aggiungere un manifest.json separato)
-(function iniettaIconaApp() {
+// restare in un unico file, senza aggiungere un manifest.json separato).
+// Il logo originale e' 160x160: Chrome/Android per l'installazione "vera"
+// (non la scorciatoia generica) vuole icone dichiarate a 192x192 e 512x512,
+// quindi le ridisegniamo al volo su canvas invece di lasciarle sgranate.
+function ridisegnaIcona(base64, lato, conMargine) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = lato;
+      canvas.height = lato;
+      const ctx = canvas.getContext('2d');
+      if (conMargine) {
+        // Android/adaptive icon ritaglia in cerchio o squircle: senza un
+        // margine il logo rischia di finire tagliato ai bordi
+        ctx.fillStyle = '#10133a';
+        ctx.fillRect(0, 0, lato, lato);
+        const dentro = Math.round(lato * 0.7);
+        const bordo = Math.round((lato - dentro) / 2);
+        ctx.drawImage(img, bordo, bordo, dentro, dentro);
+      } else {
+        ctx.drawImage(img, 0, 0, lato, lato);
+      }
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = () => resolve(base64);
+    img.src = base64;
+  });
+}
+
+async function iniettaIconaApp() {
   const link = (rel, href, type) => {
     const el = document.createElement('link');
     el.rel = rel;
@@ -779,6 +808,13 @@ const LOGO_BASE64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAIAA
   };
   link('icon', LOGO_BASE64, 'image/png');
   link('apple-touch-icon', LOGO_BASE64);
+
+  const [icona192, icona512, icona192Mask, icona512Mask] = await Promise.all([
+    ridisegnaIcona(LOGO_BASE64, 192, false),
+    ridisegnaIcona(LOGO_BASE64, 512, false),
+    ridisegnaIcona(LOGO_BASE64, 192, true),
+    ridisegnaIcona(LOGO_BASE64, 512, true),
+  ]);
   const manifest = {
     name: 'Ferari Impianti',
     short_name: 'Ferari',
@@ -786,11 +822,17 @@ const LOGO_BASE64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAACgCAIAA
     display: 'standalone',
     background_color: '#eef1f5',
     theme_color: '#10133a',
-    icons: [{ src: LOGO_BASE64, sizes: 'any', type: 'image/png' }],
+    icons: [
+      { src: icona192, sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: icona512, sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: icona192Mask, sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+      { src: icona512Mask, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+    ],
   };
   const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
   link('manifest', URL.createObjectURL(blob));
-})();
+}
+iniettaIconaApp();
 /* ============================================================ */
 /* DATI DI ESEMPIO                                               */
 /* ============================================================ */
@@ -1315,7 +1357,7 @@ function LoginPage() {
 
   if (modalitaReset) {
     return (
-      <div className="min-h-[100dvh] lg:min-h-screen bg-[#10133a] flex flex-col">
+      <div className="min-h-[100svh] lg:min-h-screen bg-[#10133a] flex flex-col">
         <div className="flex-1 flex flex-col items-center justify-center px-6 pt-[max(2rem,env(safe-area-inset-top))] pb-8 lg:pb-0">
           <img src={LOGO_BASE64} alt="Ferari Impianti" className="w-20 h-20 rounded-2xl shadow-2xl shadow-black/30 mb-5" />
           <h1 className="text-2xl font-bold text-white tracking-tight">Ferari Impianti</h1>
@@ -1376,7 +1418,7 @@ function LoginPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] lg:min-h-screen bg-[#10133a] flex flex-col">
+    <div className="min-h-[100svh] lg:min-h-screen bg-[#10133a] flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center px-6 pt-[max(2rem,env(safe-area-inset-top))] pb-8 lg:pb-0">
         <img src={LOGO_BASE64} alt="Ferari Impianti" className="w-20 h-20 rounded-2xl shadow-2xl shadow-black/30 mb-5" />
         <h1 className="text-2xl font-bold text-white tracking-tight">Ferari Impianti</h1>
@@ -1481,7 +1523,7 @@ function ImpostaNuovaPasswordPage({ onCompletato }) {
   };
 
   return (
-    <div className="min-h-[100dvh] lg:min-h-screen bg-[#10133a] flex flex-col">
+    <div className="min-h-[100svh] lg:min-h-screen bg-[#10133a] flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center px-6 pt-[max(2rem,env(safe-area-inset-top))] pb-8 lg:pb-0">
         <img src={LOGO_BASE64} alt="Ferari Impianti" className="w-20 h-20 rounded-2xl shadow-2xl shadow-black/30 mb-5" />
         <h1 className="text-2xl font-bold text-white tracking-tight">Ferari Impianti</h1>
@@ -1571,7 +1613,7 @@ function Sidebar({ currentPage, setCurrentPage, onLogout, mobileOpen, onMobileCl
       {mobileOpen && (
         <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={onMobileClose} aria-hidden="true" />
       )}
-      <aside className={`fixed lg:sticky top-0 z-50 lg:z-auto w-[min(18rem,88vw)] lg:w-64 bg-white border-r border-slate-200 flex flex-col h-[100dvh] shrink-0 transition-transform duration-200 ease-out ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+      <aside className={`fixed lg:sticky top-0 z-50 lg:z-auto w-[min(18rem,88vw)] lg:w-64 bg-white border-r border-slate-200 flex flex-col h-[100svh] shrink-0 transition-transform duration-200 ease-out ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         <div className="px-5 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] border-b border-slate-100 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <img src={LOGO_BASE64} alt="Ferari Impianti" className="w-9 h-9 rounded-lg shrink-0" />
@@ -5112,6 +5154,23 @@ function App() {
     localStorage.setItem('ferari_currentPage', currentPage);
   }, [currentPage]);
 
+  // ogni sezione aggiunge una voce alla cronologia (vedi goToPage più sotto):
+  // così su Android il tasto/gesto "indietro" del telefono torna alla
+  // sezione precedente invece di uscire subito dall'app
+  useEffect(() => {
+    const onPopState = (e) => {
+      if (mobileNavOpen) { setMobileNavOpen(false); return; }
+      const paginaPrecedente = e.state && e.state.ferariPage;
+      if (paginaPrecedente && pageConfig[paginaPrecedente]) {
+        setCurrentPage(paginaPrecedente);
+        const main = document.querySelector('main.app-scroll');
+        if (main) main.scrollTop = 0;
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [mobileNavOpen]);
+
   // stato centrale: tutta l'app legge e scrive da qui
   const [clienti, setClienti] = useState([]);
   const [clientiLoading, setClientiLoading] = useState(true);
@@ -5208,7 +5267,7 @@ function App() {
 
   if (session === undefined) {
     return (
-      <div className="min-h-[100dvh] bg-[#10133a] flex items-center justify-center">
+      <div className="min-h-[100svh] bg-[#10133a] flex items-center justify-center">
         <img src={LOGO_BASE64} alt="Ferari Impianti" className="w-16 h-16 rounded-2xl opacity-80" />
       </div>
     );
@@ -5235,6 +5294,13 @@ function App() {
   };
 
   const goToPage = (page) => {
+    // ogni sezione aggiunge una voce alla cronologia: così su Android il
+    // tasto/gesto "indietro" del telefono torna alla sezione precedente
+    // invece di uscire subito dall'app (comportamento atteso da chi usa
+    // Android tutti i giorni, diverso da come si comporta un sito normale)
+    if (page !== currentPage) {
+      window.history.pushState({ ferariPage: page }, '', '');
+    }
     setCurrentPage(page);
     setMobileNavOpen(false);
     const main = document.querySelector('main.app-scroll');
@@ -5242,7 +5308,12 @@ function App() {
   };
 
   return (
-    <div className="h-[100dvh] flex bg-[#eef1f5] lg:bg-slate-50 overflow-hidden">
+    // 100svh (non 100dvh): qui la pagina non scorre mai da sola (scorre solo
+    // <main> al suo interno), quindi la barra di Safari resta sempre nello
+    // stesso stato — con dvh, su alcuni iPhone lo spazio calcolato non
+    // corrisponde a quello davvero visibile e lascia una striscia grigia
+    // vuota sotto la barra di navigazione in basso
+    <div className="h-[100svh] flex bg-[#eef1f5] lg:bg-slate-50 overflow-hidden">
       <ToastHost />
       <Sidebar
         currentPage={currentPage}
