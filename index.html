@@ -1747,7 +1747,11 @@ function MobileBottomNav({ currentPage, setCurrentPage }) {
   ];
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-40 lg:hidden">
+    // niente "fixed" qui di proposito: sta nel normale flusso della pagina,
+    // sempre incollato al fondo vero dello schermo — con "fixed" su alcuni
+    // iPhone la sua posizione veniva calcolata su un'altezza leggermente
+    // diversa da quella davvero visibile, lasciando una striscia vuota sotto
+    <nav className="shrink-0 lg:hidden">
       <div className="mx-3 mb-[max(0.5rem,env(safe-area-inset-bottom))] app-card rounded-2xl px-1 py-1 shadow-lg shadow-slate-900/10 border-0">
         <div className="grid grid-cols-4">
           {items.map(function (item) {
@@ -5345,7 +5349,7 @@ function App() {
           </div>
         )}
 
-        <main className="flex-1 overflow-y-auto app-scroll pb-[calc(6rem+env(safe-area-inset-bottom))] lg:pb-0">
+        <main className="flex-1 overflow-y-auto app-scroll pb-6 lg:pb-0">
           <div key={currentPage} className="app-page">
         {currentPage === 'dashboard' && (
           <DashboardPage preventivi={preventivi} clienti={clienti} onVediTutti={() => setCurrentPage('preventivi')} />
@@ -5382,9 +5386,9 @@ function App() {
         {currentPage === 'squadra' && <SquadraPage preventivi={preventivi} clienti={clienti} />}
           </div>
         </main>
-      </div>
 
-      <MobileBottomNav currentPage={currentPage} setCurrentPage={goToPage} />
+        <MobileBottomNav currentPage={currentPage} setCurrentPage={goToPage} />
+      </div>
     </div>
   );
 }
