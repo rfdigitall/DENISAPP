@@ -20,6 +20,18 @@
 <style>
   * { box-sizing: border-box; }
   html, body, #root { height: 100%; }
+  /* iOS in modalità standalone (app aggiunta alla Home) ha un bug noto:
+     100% / 100vh / 100dvh a volte non corrispondono all'altezza davvero
+     visibile e lasciano una striscia vuota in fondo — succede SOLO in
+     standalone, mai dentro Safari normale. -webkit-fill-available è il
+     fallback storicamente affidabile per questo bug specifico; si applica
+     solo su WebKit (Safari/iOS) grazie al feature-check qui sotto, quindi
+     non tocca Chrome/Android. */
+  @supports (-webkit-touch-callout: none) {
+    html, body, #root {
+      height: -webkit-fill-available;
+    }
+  }
   html {
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior: none;
@@ -40,6 +52,16 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
     background: #eef1f5;
     -webkit-font-smoothing: antialiased;
+  }
+  @supports (-webkit-touch-callout: none) {
+    body { height: -webkit-fill-available; }
+  }
+  .h-app-viewport {
+    height: 100vh;
+    height: 100dvh;
+  }
+  @supports (-webkit-touch-callout: none) {
+    .h-app-viewport { height: -webkit-fill-available; }
   }
   #errbox { display:none; padding:24px; font-family:monospace; font-size:13px; color:#b91c1c;
             background:#fef2f2; border:1px solid #fecaca; margin:24px; border-radius:8px;
@@ -1623,7 +1645,7 @@ function Sidebar({ currentPage, setCurrentPage, onLogout, mobileOpen, onMobileCl
       {mobileOpen && (
         <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={onMobileClose} aria-hidden="true" />
       )}
-      <aside className={`fixed lg:sticky top-0 z-50 lg:z-auto w-[min(18rem,88vw)] lg:w-64 bg-white border-r border-slate-200 flex flex-col h-[100dvh] shrink-0 transition-transform duration-200 ease-out ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+      <aside className={`h-app-viewport fixed lg:sticky top-0 z-50 lg:z-auto w-[min(18rem,88vw)] lg:w-64 bg-white border-r border-slate-200 flex flex-col shrink-0 transition-transform duration-200 ease-out ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         <div className="px-5 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] border-b border-slate-100 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <img src={LOGO_BASE64} alt="Ferari Impianti" className="w-9 h-9 rounded-lg shrink-0" />
@@ -5322,7 +5344,7 @@ function App() {
   };
 
   return (
-    <div className="h-[100dvh] flex bg-[#eef1f5] lg:bg-slate-50 overflow-hidden">
+    <div className="h-app-viewport flex bg-[#eef1f5] lg:bg-slate-50 overflow-hidden">
       <ToastHost />
       <Sidebar
         currentPage={currentPage}
