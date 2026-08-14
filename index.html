@@ -1780,29 +1780,28 @@ function MobileBottomNav({ currentPage, setCurrentPage }) {
 
   return (
     // niente "fixed" qui di proposito: sta nel normale flusso della pagina,
-    // sempre incollato al fondo vero dello schermo — con "fixed" su alcuni
-    // iPhone la sua posizione veniva calcolata su un'altezza leggermente
-    // diversa da quella davvero visibile, lasciando una striscia vuota sotto
-    <nav className="shrink-0 lg:hidden">
-      <div className="mx-3 mb-[max(0.5rem,env(safe-area-inset-bottom))] app-card rounded-2xl px-1 py-1 shadow-lg shadow-slate-900/10 border-0">
-        <div className="grid grid-cols-4">
-          {items.map(function (item) {
-            const Icon = item.icon;
-            const isActive = currentPage === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setCurrentPage(item.id)}
-                className={`relative flex flex-col items-center justify-center gap-0.5 py-2 px-1 rounded-xl transition-all active:scale-95 ${isActive ? 'text-blue-700' : 'text-slate-400'}`}
-              >
-                {isActive && <span className="absolute inset-x-1 inset-y-0.5 bg-blue-50 rounded-xl -z-10" />}
-                <Icon className={`w-[22px] h-[22px] ${isActive ? 'text-blue-600' : 'text-slate-400'}`} strokeWidth={isActive ? 2.25 : 2} />
-                <span className="text-[10px] font-bold">{item.label}</span>
-              </button>
-            );
-          })}
-        </div>
+    // sempre incollato al fondo vero dello schermo. Barra piatta a tutta
+    // larghezza (non più una "pillola" flottante con margini): lo sfondo
+    // bianco arriva fino al bordo vero dello schermo, il padding (non
+    // margin) tiene solo le icone sopra la zona del gesto home — così non
+    // si vede nessun "buco" di sfondo pagina sotto la barra.
+    <nav className="shrink-0 lg:hidden bg-white border-t border-slate-200">
+      <div className="grid grid-cols-4">
+        {items.map(function (item) {
+          const Icon = item.icon;
+          const isActive = currentPage === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setCurrentPage(item.id)}
+              className={`flex flex-col items-center justify-center gap-0.5 py-1.5 px-1 transition-colors active:bg-slate-50 ${isActive ? 'text-blue-600' : 'text-slate-400'}`}
+            >
+              <Icon className="w-5 h-5" strokeWidth={isActive ? 2.25 : 2} />
+              <span className="text-[10px] font-bold">{item.label}</span>
+            </button>
+          );
+        })}
       </div>
     </nav>
   );
@@ -5146,6 +5145,87 @@ function mostraToast(messaggio, tipo = 'errore') {
   window.dispatchEvent(new CustomEvent('ferari-toast', { detail: { messaggio, tipo } }));
 }
 
+// pannello diagnostico TEMPORANEO — per capire cosa succede davvero in modalità
+// standalone su un iPhone/Android reale, cosa che non riusciamo a vedere dal
+// nostro strumento di test (gira su Chrome desktop, non WebKit reale, e mai in
+// vera modalità standalone). Da togliere una volta risolto il problema.
+function misuraSafeArea() {
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed; top:0; left:0; visibility:hidden; padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom);';
+  document.body.appendChild(probe);
+  const cs = getComputedStyle(probe);
+  const risultato = { top: cs.paddingTop, bottom: cs.paddingBottom };
+  document.body.removeChild(probe);
+  return risultato;
+}
+
+function DiagnosticaPanel() {
+  const [aperto, setAperto] = useState(false);
+  const [dati, setDati] = useState(null);
+
+  const aggiorna = () => {
+    const safeArea = misuraSafeArea();
+    const nav = Array.from(document.querySelectorAll('nav')).find(n => !n.closest('aside'));
+    const navR = nav ? nav.getBoundingClientRect() : null;
+    const pillola = nav ? nav.firstElementChild : null; // la pastilla bianca arrotondata visibile
+    const pillolaR = pillola ? pillola.getBoundingClientRect() : null;
+    const pillolaCS = pillola ? getComputedStyle(pillola) : null;
+    const main = document.querySelector('main.app-scroll');
+    const mainR = main ? main.getBoundingClientRect() : null;
+    const appPage = document.querySelector('.app-page');
+    const carte = appPage ? Array.from(appPage.querySelectorAll(':scope > .app-card, :scope > div > .app-card')) : [];
+    const ultimaCard = carte.length ? carte[carte.length - 1] : null;
+    const cardR = ultimaCard ? ultimaCard.getBoundingClientRect() : null;
+    setDati({
+      standaloneIOS: window.navigator.standalone,
+      displayModeStandalone: window.matchMedia('(display-mode: standalone)').matches,
+      innerHeight: window.innerHeight,
+      docClientHeight: document.documentElement.clientHeight,
+      devicePixelRatio: window.devicePixelRatio,
+      safeAreaTop: safeArea.top,
+      safeAreaBottom: safeArea.bottom,
+      navBoxBottom: navR ? Math.round(navR.bottom) : 'n/d',
+      navBoxTop: navR ? Math.round(navR.top) : 'n/d',
+      pillolaBottom: pillolaR ? Math.round(pillolaR.bottom) : 'n/d',
+      pillolaMarginBottom: pillolaCS ? pillolaCS.marginBottom : 'n/d',
+      spazioSottoPillola: pillolaR ? Math.round(window.innerHeight - pillolaR.bottom) : 'n/d',
+      mainBottom: mainR ? Math.round(mainR.bottom) : 'n/d',
+      ultimaCardBottom: cardR ? Math.round(cardR.bottom) : 'n/d',
+      spazioCardNav: (cardR && navR) ? Math.round(navR.top - cardR.bottom) : 'n/d',
+      userAgent: navigator.userAgent.slice(0, 60),
+    });
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => { setAperto(true); aggiorna(); }}
+        className="fixed top-2 right-2 z-[200] w-8 h-8 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center shadow-lg"
+        style={{ top: 'calc(env(safe-area-inset-top) + 0.5rem)' }}
+      >
+        🔧
+      </button>
+      {aperto && dati && (
+        <div className="fixed inset-0 z-[201] bg-black/70 flex items-center justify-center p-4" onClick={() => setAperto(false)}>
+          <div className="bg-white rounded-xl p-4 max-w-sm w-full max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-bold text-slate-900">Diagnostica schermo</p>
+              <button onClick={() => setAperto(false)} className="text-slate-400"><X className="w-5 h-5" /></button>
+            </div>
+            <pre className="text-[10px] font-mono whitespace-pre-wrap break-all bg-slate-50 p-2 rounded-lg text-slate-700">
+              {JSON.stringify(dati, null, 1)}
+            </pre>
+            <button onClick={aggiorna} className="mt-3 w-full bg-slate-900 text-white text-xs font-semibold py-2 rounded-lg">
+              Aggiorna
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function ToastHost() {
   const [toast, setToast] = useState(null);
   useEffect(() => {
@@ -5221,9 +5301,26 @@ function App() {
 
   useEffect(() => {
     sb.auth.getSession().then(({ data }) => setSession(data.session));
+    // BUG CRITICO risolto: Supabase riprova a rinnovare la sessione da solo,
+    // soprattutto quando l'app torna in primo piano (esattamente quando Denis
+    // tocca lo schermo dopo essere stato "via" un attimo sul cantiere). Se sul
+    // campo il segnale è debole, quel rinnovo può fallire e arrivare qui con
+    // una sessione vuota anche se l'utente NON ha fatto logout — prima la
+    // accettavamo alla cieca e buttavamo giù tutta la schermata (preventivo
+    // in corso compreso, mai salvato). Ora un "vuoto" conta solo se è un vero
+    // SIGNED_OUT esplicito; per qualunque altro evento, teniamo la sessione
+    // che avevamo finché non ne arriva una valida.
     const { data: subscription } = sb.auth.onAuthStateChange((event, nuovaSessione) => {
       if (event === 'PASSWORD_RECOVERY') setModalitaRecupero(true);
-      setSession(nuovaSessione);
+      if (event === 'SIGNED_OUT') {
+        setSession(null);
+        return;
+      }
+      if (nuovaSessione) {
+        setSession(nuovaSessione);
+      }
+      // else: rinnovo fallito/momentaneo senza un vero logout — non tocchiamo
+      // la sessione attuale, così il lavoro in corso non va perso
     });
     return () => subscription.subscription.unsubscribe();
   }, []);
@@ -5245,7 +5342,7 @@ function App() {
       setClientiLoading(false);
     });
     return () => { annullato = true; };
-  }, [session]);
+  }, [session?.user?.id]);
 
   // preventivi: stesso pattern dei clienti
   useEffect(() => {
@@ -5263,7 +5360,7 @@ function App() {
       setPreventiviLoading(false);
     });
     return () => { annullato = true; };
-  }, [session]);
+  }, [session?.user?.id]);
 
   // materiali: stesso pattern
   useEffect(() => {
@@ -5281,7 +5378,7 @@ function App() {
       setMaterialiLoading(false);
     });
     return () => { annullato = true; };
-  }, [session]);
+  }, [session?.user?.id]);
 
   // prodotti (catalogo): stesso pattern
   useEffect(() => {
@@ -5299,7 +5396,7 @@ function App() {
       setProdottiLoading(false);
     });
     return () => { annullato = true; };
-  }, [session]);
+  }, [session?.user?.id]);
 
   if (session === undefined) {
     return (
@@ -5346,6 +5443,7 @@ function App() {
   return (
     <div className="h-app-viewport flex bg-[#eef1f5] lg:bg-slate-50 overflow-hidden">
       <ToastHost />
+      <DiagnosticaPanel />
       <Sidebar
         currentPage={currentPage}
         setCurrentPage={goToPage}
