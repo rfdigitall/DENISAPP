@@ -927,6 +927,9 @@ const CATEGORIE_DOCUMENTO_DEFAULT = [
 
 function categoriaDefaultVoce(item) {
   const nome = (item.nome || '').toLowerCase();
+  if (item.kind === 'lavoro' && (nome.includes('smontaggio') || nome.includes('smaltimento') || nome.includes('demolizione') || nome.includes('rimozione'))) {
+    return 'SMANTELLAMENTO E SMALTIMENTO';
+  }
   if (item.zona === 'centrale' || nome.includes('caldaia') || nome.includes('climatizzat')) {
     return 'INSTALLAZIONE E COLLEGAMENTO IMPIANTO DI CLIMATIZZAZIONE';
   }
@@ -937,11 +940,32 @@ function categoriaDefaultVoce(item) {
 }
 
 function dicituraDefaultVoce(item) {
+  if (item.kind === 'lavoro') {
+    const testo = item.nome.trim();
+    const testoConMaiuscola = testo.charAt(0).toUpperCase() + testo.slice(1);
+    return testoConMaiuscola.endsWith('.') ? testoConMaiuscola : testoConMaiuscola + '.';
+  }
   if (item.kind === 'prodotto') {
+    // FASE 4 raffinata — dicitura ricca come nei preventivi reali di Denis:
+    // marca/fornitore, misure e la descrizione tecnica del prodotto, non solo
+    // "fornitura e installazione" ripetuto uguale su ogni riga
     const smontaggio = item.tipoInstallazione === 'sostituzione'
       ? `Smontaggio e smaltimento del vecchio ${item.nome.toLowerCase()}. `
       : '';
-    return `${smontaggio}Fornitura e installazione di ${item.nome}${item.meta ? ' (' + item.meta + ')' : ''}.`;
+    let frase = `Fornitura e posa in opera di ${item.nome}`;
+    if (item.fornitore) frase += ` ${item.fornitore}`;
+    if (item.misuraLunghezza || item.misuraProfondita || item.misuraAltezza) {
+      frase += `, misure ${item.misuraLunghezza || '–'}×${item.misuraProfondita || '–'}×${item.misuraAltezza || '–'} cm`;
+    }
+    frase += '.';
+    if (item.descrizioneProdotto && item.descrizioneProdotto.trim()) {
+      const desc = item.descrizioneProdotto.trim();
+      frase += ' ' + (desc.endsWith('.') ? desc : desc + '.');
+    }
+    return smontaggio + frase;
+  }
+  if (item.kind === 'materiale' && item.unita) {
+    return `Fornitura e posa in opera di ${item.nome.toLowerCase()} (${item.qty} ${item.unita}).`;
   }
   return `Fornitura e posa in opera di ${item.nome.toLowerCase()}.`;
 }
@@ -1112,7 +1136,7 @@ async function generaPDFCliente({ cliente, carrello, diciture, totale, nextId, l
   doc.save(`Preventivo_${cliente.nome.replace(/\s/g,'_')}_${nextId}.pdf`);
 }
 
-async function generaPDFInterno({ cliente, carrello, subMat, subProd, rincaro, totale, rincaroMode, rPct, rOre, rTar, nextId }) {
+async function generaPDFInterno({ cliente, carrello, subMat, subProd, subLavoro, rincaro, totale, rincaroMode, rPct, rOre, rTar, nextId }) {
   const jsPDF = await loadJsPDF();
   const doc = new jsPDF({ unit:'mm', format:'a4', orientation:'portrait' });
 
@@ -1175,6 +1199,7 @@ async function generaPDFInterno({ cliente, carrello, subMat, subProd, rincaro, t
   // subtotali
   const rows = [
     ['Subtotale materiali + prodotti', fmtEuro2(subMat + subProd)],
+    ...(subLavoro > 0 ? [['Voci di lavoro', fmtEuro2(subLavoro)]] : []),
     [rincaroMode === 'percent' ? `Manodopera (${rPct}% sui materiali)` : `Manodopera (${rOre}h × ${rTar} €/h)`, fmtEuro2(rincaro)],
   ];
   rows.forEach(([label, value]) => {
@@ -2800,6 +2825,9 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
   const [nmZona, setNmZona] = useState('');
   const [nmSalvando, setNmSalvando] = useState(false);
   const [nmErrore, setNmErrore] = useState('');
+  const [showNuovoLavoro, setShowNuovoLavoro] = useState(false);
+  const [lavoroDescrizione, setLavoroDescrizione] = useState('');
+  const [lavoroPrezzo, setLavoroPrezzo] = useState('');
   const [rincaroMode, setRincaroMode] = useState('percent');
   const [rincaroPercent, setRincaroPercent] = useState('10');
   const [rincaroOre, setRincaroOre] = useState('8');
@@ -2855,10 +2883,11 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
 
   const subtotaleMateriali = carrello.filter(i => i.kind === 'materiale').reduce((s, i) => s + i.prezzoUnitario * i.qty, 0);
   const subtotaleProdotti = carrello.filter(i => i.kind === 'prodotto').reduce((s, i) => s + i.prezzoUnitario * i.qty, 0);
+  const subtotaleLavoro = carrello.filter(i => i.kind === 'lavoro').reduce((s, i) => s + i.prezzoUnitario * i.qty, 0);
   const rincaroValore = rincaroMode === 'percent'
     ? subtotaleMateriali * ((parseFloat(rincaroPercent) || 0) / 100)
     : (parseFloat(rincaroOre) || 0) * (parseFloat(rincaroTariffa) || 0);
-  const totale = subtotaleMateriali + subtotaleProdotti + rincaroValore;
+  const totale = subtotaleMateriali + subtotaleProdotti + subtotaleLavoro + rincaroValore;
 
   const startNuovo = () => {
     setModificaId(null);
@@ -2911,7 +2940,7 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
       setCarrello(prev => {
         const exists = prev.find(i => i.id === matId);
         const qty = exists ? exists.qty : 1;
-        const nuovaVoce = { id: matId, nome: mat.nome, meta: `${qty} ${mat.unita} × ${valore.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €`, prezzoUnitario: valore, qty, kind: 'materiale', zona: exists?.zona || zonaAttiva };
+        const nuovaVoce = { id: matId, nome: mat.nome, meta: `${qty} ${mat.unita} × ${valore.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €`, prezzoUnitario: valore, qty, kind: 'materiale', zona: exists?.zona || zonaAttiva, unita: mat.unita };
         if (exists) return prev.map(i => i.id === matId ? nuovaVoce : i);
         return [...prev, nuovaVoce];
       });
@@ -2933,7 +2962,7 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
         return prev.map(i => i.id === matId ? { ...i, qty, meta } : i);
       }
       if (qty <= 0) return prev;
-      return [...prev, { id: mat.id, nome: mat.nome, meta, prezzoUnitario, qty, kind: 'materiale', zona: zonaAttiva }];
+      return [...prev, { id: mat.id, nome: mat.nome, meta, prezzoUnitario, qty, kind: 'materiale', zona: zonaAttiva, unita: mat.unita }];
     });
   };
 
@@ -2957,7 +2986,7 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
     setCarrello(prev => [...prev, {
       id: nuovoMat.id, nome: nuovoMat.nome,
       meta: `1 ${nuovoMat.unita} × ${nuovoMat.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €`,
-      prezzoUnitario: nuovoMat.prezzo, qty: 1, kind: 'materiale', zona: zonaAttiva,
+      prezzoUnitario: nuovoMat.prezzo, qty: 1, kind: 'materiale', zona: zonaAttiva, unita: nuovoMat.unita,
     }]);
     setNmNome('');
     setNmUnita('m');
@@ -2966,12 +2995,35 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
     setShowNuovoMateriale(false);
   };
 
+  // voce di lavoro/manodopera libera (es. "smontaggio vecchi sanitari") — non
+  // fa parte del catalogo prodotti/materiali, resta legata solo a questo preventivo
+  const aggiungiVoceLavoro = () => {
+    const descrizione = lavoroDescrizione.trim();
+    if (!descrizione) return;
+    const prezzo = parseFloat((lavoroPrezzo || '0').replace(',', '.')) || 0;
+    setCarrello(prev => [...prev, {
+      id: 'lavoro-' + Date.now(),
+      nome: descrizione,
+      meta: prezzo > 0 ? `Lavoro · ${prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €` : 'Lavoro',
+      prezzoUnitario: prezzo, qty: 1, kind: 'lavoro', zona: zonaAttiva,
+    }]);
+    setLavoroDescrizione('');
+    setLavoroPrezzo('');
+    setShowNuovoLavoro(false);
+  };
+
   const toggleProdotto = (p) => {
     const exists = carrello.find(i => i.id === p.id);
     if (exists) {
       setCarrello(carrello.filter(i => i.id !== p.id));
     } else {
-      setCarrello([...carrello, { id: p.id, nome: p.nome, meta: p.tier, prezzoUnitario: p.prezzo, qty: 1, kind: 'prodotto', zona: zonaAttiva, tipoInstallazione: 'nuova' }]);
+      setCarrello([...carrello, {
+        id: p.id, nome: p.nome, meta: p.tier, prezzoUnitario: p.prezzo, qty: 1, kind: 'prodotto',
+        zona: zonaAttiva, tipoInstallazione: 'nuova',
+        // portati nel carrello per generare una dicitura ricca nel documento (FASE 4)
+        fornitore: p.fornitore, misuraLunghezza: p.misuraLunghezza, misuraProfondita: p.misuraProfondita,
+        misuraAltezza: p.misuraAltezza, descrizioneProdotto: p.descrizione,
+      }]);
     }
   };
 
@@ -3406,7 +3458,8 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
               if (!clienteDett) return;
               const subMat = carrelloDett.filter(i => i.kind === 'materiale').reduce((s, i) => s + i.prezzoUnitario * i.qty, 0);
               const subProd = carrelloDett.filter(i => i.kind === 'prodotto').reduce((s, i) => s + i.prezzoUnitario * i.qty, 0);
-              await generaPDFInterno({ cliente: clienteDett, carrello: carrelloDett, subMat, subProd, rincaro: rincaroDett, totale: p.importo, rincaroMode: 'percent', rPct: '10', rOre: '8', rTar: '35', nextId: p.id });
+              const subLavoro = carrelloDett.filter(i => i.kind === 'lavoro').reduce((s, i) => s + i.prezzoUnitario * i.qty, 0);
+              await generaPDFInterno({ cliente: clienteDett, carrello: carrelloDett, subMat, subProd, subLavoro, rincaro: rincaroDett, totale: p.importo, rincaroMode: 'percent', rPct: '10', rOre: '8', rTar: '35', nextId: p.id });
             }}
             className="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
           >
@@ -3714,6 +3767,82 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
               </div>
             </div>
 
+            {/* voci di lavoro/manodopera libere — non fanno parte del catalogo,
+                es. "smontaggio vecchi sanitari" richiesto da un cliente */}
+            <div className="app-card overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Voci di lavoro</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">Lavori/manodopera fuori catalogo, es. smontaggi o demolizioni</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowNuovoLavoro(!showNuovoLavoro)}
+                  className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 shrink-0"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Nuova voce
+                </button>
+              </div>
+              {showNuovoLavoro && (
+                <div className="px-5 py-4 bg-slate-50 border-b border-slate-100">
+                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2.5 items-end">
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-500 mb-1">Descrizione del lavoro</label>
+                      <input
+                        type="text"
+                        autoFocus
+                        value={lavoroDescrizione}
+                        onChange={(e) => setLavoroDescrizione(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && aggiungiVoceLavoro()}
+                        placeholder="Es. Smontaggio vecchi sanitari"
+                        className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-500 mb-1">Prezzo € (opzionale)</label>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={lavoroPrezzo}
+                        onChange={(e) => setLavoroPrezzo(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && aggiungiVoceLavoro()}
+                        placeholder="0,00"
+                        className="w-28 px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={aggiungiVoceLavoro}
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                      >
+                        Aggiungi
+                      </button>
+                      <button
+                        onClick={() => setShowNuovoLavoro(false)}
+                        className="px-3 py-2 text-slate-400 hover:text-slate-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {carrello.filter(i => i.kind === 'lavoro').length > 0 && (
+                <div className="divide-y divide-slate-50">
+                  {carrello.filter(i => i.kind === 'lavoro').map(item => (
+                    <div key={item.id} className="px-4 sm:px-5 py-3 flex items-center justify-between gap-3">
+                      <p className="text-sm font-medium text-slate-900 min-w-0 truncate">{item.nome}</p>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-sm font-bold text-slate-900">{fmtEuro(Math.round(item.prezzoUnitario))}</span>
+                        <button onClick={() => rimuoviVoce(item.id)} className="text-slate-300 hover:text-red-500"><X className="w-3.5 h-3.5" /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* rincaro */}
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
               <p className="text-sm font-semibold text-slate-900 mb-3">Manodopera & rincaro</p>
@@ -3947,8 +4076,8 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
                   </div>
 
                   <div className="px-5 py-3 flex items-center justify-between border-t border-slate-100">
-                    <span className="text-xs font-semibold text-slate-500">Subtotale materiali</span>
-                    <span className="font-mono text-sm font-bold text-slate-900">{fmtEuro(Math.round(subtotaleMateriali + subtotaleProdotti))}</span>
+                    <span className="text-xs font-semibold text-slate-500">Subtotale materiali, prodotti e lavori</span>
+                    <span className="font-mono text-sm font-bold text-slate-900">{fmtEuro(Math.round(subtotaleMateriali + subtotaleProdotti + subtotaleLavoro))}</span>
                   </div>
                   <div className="px-5 py-3 flex items-center justify-between border-t border-slate-100">
                     <span className="text-xs font-semibold text-slate-500">
@@ -4089,6 +4218,7 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
                       carrello,
                       subMat: carrello.filter(i=>i.kind==='materiale').reduce((s,i)=>s+i.prezzoUnitario*i.qty,0),
                       subProd: carrello.filter(i=>i.kind==='prodotto').reduce((s,i)=>s+i.prezzoUnitario*i.qty,0),
+                      subLavoro: subtotaleLavoro,
                       rincaro: rincaroValore,
                       totale,
                       rincaroMode,
@@ -4513,6 +4643,7 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
   const [activeCat, setActiveCat] = useState(categorieCatalogo[0]);
   const [activeSub, setActiveSub] = useState('Tutte');
   const [activeFornitoreFiltro, setActiveFornitoreFiltro] = useState('Tutti');
+  const [queryRicerca, setQueryRicerca] = useState('');
   const [showNewForm, setShowNewForm] = useState(false);
   const [newNome, setNewNome] = useState('');
   const [newFornitore, setNewFornitore] = useState('');
@@ -4538,6 +4669,30 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
   const prodottiCategoria = prodotti.filter(p => p.categoria === activeCat && (activeFornitoreFiltro === 'Tutti' || p.fornitore === activeFornitoreFiltro));
   const sottocategorie = ['Tutte', ...new Set(prodottiCategoria.map(p => p.sottocategoria).filter(Boolean))];
   const filtered = prodottiCategoria.filter(p => activeSub === 'Tutte' || p.sottocategoria === activeSub);
+
+  // ricerca: cerca in TUTTO il catalogo (ignora categoria/sottocategoria/fornitore),
+  // così Denis trova subito il pezzo per nome senza dover prima entrare nella categoria giusta
+  const ricercaAttiva = queryRicerca.trim().length > 0;
+  const risultatiRicerca = ricercaAttiva
+    ? (() => {
+        const q = queryRicerca.trim().toLowerCase();
+        return prodotti.filter(p =>
+          (p.nome || '').toLowerCase().includes(q) ||
+          (p.codice || '').toLowerCase().includes(q) ||
+          (p.descrizione || '').toLowerCase().includes(q) ||
+          (p.sottocategoria || '').toLowerCase().includes(q)
+        );
+      })()
+    : [];
+
+  // vista a cartelle: dentro una categoria mostriamo prima le sue sottocategorie
+  // (come cartelle), non subito la lista intera di prodotti — solo quando la
+  // categoria ha davvero più di una sottocategoria, altrimenti è inutile
+  const mostraCartelle = !ricercaAttiva && activeSub === 'Tutte' && sottocategorie.length > 1;
+  const conteggioSottocategorie = sottocategorie
+    .filter(s => s !== 'Tutte')
+    .map(sub => ({ nome: sub, count: prodottiCategoria.filter(p => p.sottocategoria === sub).length }));
+  const prodottiDaMostrare = ricercaAttiva ? risultatiRicerca : filtered;
 
   const fornitoreForm = newFornitore || fornitoreDiCategoria(activeCat) || FORNITORI_CATALOGO[0];
   const sottocategorieStruttura = CATALOGO_STRUTTURA[fornitoreForm]?.[activeCat] || [];
@@ -4713,60 +4868,104 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
         </div>
       )}
 
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex gap-1.5 bg-white border border-slate-200 rounded-xl p-1 overflow-x-auto">
-          {[...new Set([...categorieCatalogo, ...prodotti.map(p => p.categoria).filter(Boolean)])].map((cat) => (
+      {/* ricerca diretta per nome/codice — cerca in tutto il catalogo, salta la navigazione */}
+      <div className="flex items-center gap-2.5">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            value={queryRicerca}
+            onChange={(e) => setQueryRicerca(e.target.value)}
+            placeholder="Cerca un prodotto per nome o codice..."
+            className="w-full pl-9 pr-9 py-2.5 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+          />
+          {ricercaAttiva && (
             <button
-              key={cat}
-              onClick={() => { setActiveCat(cat); setActiveSub('Tutte'); }}
-              className={`px-3.5 py-2.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
-                activeCat === cat ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-900'
-              }`}
+              type="button"
+              onClick={() => setQueryRicerca('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"
             >
-              {cat}
+              <X className="w-4 h-4" />
             </button>
-          ))}
+          )}
         </div>
-        <button
-          onClick={() => setShowNewForm(!showNewForm)}
-          className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Nuovo prodotto
-        </button>
-      </div>
-
-      {/* filtro fornitore — es. "solo Deghi" quando mostri i bagni al cliente,
-          "solo Tecnomat" quando fai un ordine */}
-      <div className="flex flex-wrap gap-1.5">
-        {['Tutti', ...FORNITORI_CATALOGO].map(f => (
+        {!ricercaAttiva && (
           <button
-            key={f}
-            onClick={() => { setActiveFornitoreFiltro(f); setActiveSub('Tutte'); }}
-            className={`px-3.5 py-2.5 rounded-full text-xs font-semibold transition-colors ${
-              activeFornitoreFiltro === f ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-100'
-            }`}
+            onClick={() => setShowNewForm(!showNewForm)}
+            className="shrink-0 flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-3.5 py-2.5 rounded-lg transition-colors"
           >
-            {f}
+            <Plus className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Nuovo prodotto</span>
           </button>
-        ))}
+        )}
       </div>
 
-      {/* sottocategorie della categoria attiva — filtro rapido richiesto dal cliente */}
-      {sottocategorie.length > 1 && (
-        <div className="flex flex-wrap gap-1.5">
-          {sottocategorie.map(sub => (
+      {!ricercaAttiva && (
+        <>
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex gap-1.5 bg-white border border-slate-200 rounded-xl p-1 overflow-x-auto">
+              {[...new Set([...categorieCatalogo, ...prodotti.map(p => p.categoria).filter(Boolean)])].map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => { setActiveCat(cat); setActiveSub('Tutte'); }}
+                  className={`px-3.5 py-2.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
+                    activeCat === cat ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* filtro fornitore — es. "solo Deghi" quando mostri i bagni al cliente,
+              "solo Tecnomat" quando fai un ordine */}
+          <div className="flex flex-wrap gap-1.5">
+            {['Tutti', ...FORNITORI_CATALOGO].map(f => (
+              <button
+                key={f}
+                onClick={() => { setActiveFornitoreFiltro(f); setActiveSub('Tutte'); }}
+                className={`px-3.5 py-2.5 rounded-full text-xs font-semibold transition-colors ${
+                  activeFornitoreFiltro === f ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-100'
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+
+          {/* dentro una categoria: prima le sottocategorie come cartelle, si entra
+              per vedere solo i prodotti di quella — non più tutta la lista insieme */}
+          {activeSub !== 'Tutte' && (
             <button
-              key={sub}
-              onClick={() => setActiveSub(sub)}
-              className={`px-3.5 py-2.5 rounded-full text-xs font-semibold transition-colors ${
-                activeSub === sub ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-              }`}
+              onClick={() => setActiveSub('Tutte')}
+              className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 -mb-1"
             >
-              {sub}
+              <ArrowLeft className="w-3.5 h-3.5" />
+              Tutte le sottocategorie di {activeCat}
             </button>
-          ))}
-        </div>
+          )}
+
+          {mostraCartelle && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {conteggioSottocategorie.map(({ nome, count }) => (
+                <button
+                  key={nome}
+                  onClick={() => setActiveSub(nome)}
+                  className="app-card p-4 flex flex-col items-start gap-2 text-left hover:border-blue-300 transition-colors"
+                >
+                  <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
+                    <ShoppingBag className="w-[18px] h-[18px] text-blue-600" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-slate-900 leading-snug">{nome}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{count} prodott{count === 1 ? 'o' : 'i'}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {showNewForm && (
@@ -4938,8 +5137,15 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
         </div>
       )}
 
+      {ricercaAttiva && (
+        <p className="text-xs font-semibold text-slate-500">
+          {risultatiRicerca.length} risultat{risultatiRicerca.length === 1 ? 'o' : 'i'} per "{queryRicerca.trim()}"
+        </p>
+      )}
+
+      {!mostraCartelle && (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.map((p) => (
+        {prodottiDaMostrare.map((p) => (
           <div key={p.id} className="app-card overflow-hidden group">
             <label className="h-28 bg-slate-50 flex flex-col items-center justify-center gap-1.5 relative cursor-pointer overflow-hidden">
               {p.fotoUrl ? (
@@ -5044,15 +5250,16 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
             </div>
           </div>
         ))}
-        {filtered.length === 0 && (
+        {prodottiDaMostrare.length === 0 && (
           <div className="sm:col-span-2 lg:col-span-3 app-card py-14 flex flex-col items-center justify-center text-center">
             <ShoppingBag className="w-7 h-7 text-slate-300 mb-2" />
             <p className="text-sm text-slate-400">
-              {prodottiLoading ? 'Caricamento catalogo...' : 'Nessun prodotto in questa categoria.'}
+              {prodottiLoading ? 'Caricamento catalogo...' : ricercaAttiva ? 'Nessun prodotto trovato.' : 'Nessun prodotto in questa categoria.'}
             </p>
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
@@ -5143,87 +5350,6 @@ const pageConfig = {
 // di app vera; questo resta dentro lo stile dell'app
 function mostraToast(messaggio, tipo = 'errore') {
   window.dispatchEvent(new CustomEvent('ferari-toast', { detail: { messaggio, tipo } }));
-}
-
-// pannello diagnostico TEMPORANEO — per capire cosa succede davvero in modalità
-// standalone su un iPhone/Android reale, cosa che non riusciamo a vedere dal
-// nostro strumento di test (gira su Chrome desktop, non WebKit reale, e mai in
-// vera modalità standalone). Da togliere una volta risolto il problema.
-function misuraSafeArea() {
-  const probe = document.createElement('div');
-  probe.style.cssText = 'position:fixed; top:0; left:0; visibility:hidden; padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom);';
-  document.body.appendChild(probe);
-  const cs = getComputedStyle(probe);
-  const risultato = { top: cs.paddingTop, bottom: cs.paddingBottom };
-  document.body.removeChild(probe);
-  return risultato;
-}
-
-function DiagnosticaPanel() {
-  const [aperto, setAperto] = useState(false);
-  const [dati, setDati] = useState(null);
-
-  const aggiorna = () => {
-    const safeArea = misuraSafeArea();
-    const nav = Array.from(document.querySelectorAll('nav')).find(n => !n.closest('aside'));
-    const navR = nav ? nav.getBoundingClientRect() : null;
-    const pillola = nav ? nav.firstElementChild : null; // la pastilla bianca arrotondata visibile
-    const pillolaR = pillola ? pillola.getBoundingClientRect() : null;
-    const pillolaCS = pillola ? getComputedStyle(pillola) : null;
-    const main = document.querySelector('main.app-scroll');
-    const mainR = main ? main.getBoundingClientRect() : null;
-    const appPage = document.querySelector('.app-page');
-    const carte = appPage ? Array.from(appPage.querySelectorAll(':scope > .app-card, :scope > div > .app-card')) : [];
-    const ultimaCard = carte.length ? carte[carte.length - 1] : null;
-    const cardR = ultimaCard ? ultimaCard.getBoundingClientRect() : null;
-    setDati({
-      standaloneIOS: window.navigator.standalone,
-      displayModeStandalone: window.matchMedia('(display-mode: standalone)').matches,
-      innerHeight: window.innerHeight,
-      docClientHeight: document.documentElement.clientHeight,
-      devicePixelRatio: window.devicePixelRatio,
-      safeAreaTop: safeArea.top,
-      safeAreaBottom: safeArea.bottom,
-      navBoxBottom: navR ? Math.round(navR.bottom) : 'n/d',
-      navBoxTop: navR ? Math.round(navR.top) : 'n/d',
-      pillolaBottom: pillolaR ? Math.round(pillolaR.bottom) : 'n/d',
-      pillolaMarginBottom: pillolaCS ? pillolaCS.marginBottom : 'n/d',
-      spazioSottoPillola: pillolaR ? Math.round(window.innerHeight - pillolaR.bottom) : 'n/d',
-      mainBottom: mainR ? Math.round(mainR.bottom) : 'n/d',
-      ultimaCardBottom: cardR ? Math.round(cardR.bottom) : 'n/d',
-      spazioCardNav: (cardR && navR) ? Math.round(navR.top - cardR.bottom) : 'n/d',
-      userAgent: navigator.userAgent.slice(0, 60),
-    });
-  };
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => { setAperto(true); aggiorna(); }}
-        className="fixed top-2 right-2 z-[200] w-8 h-8 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center shadow-lg"
-        style={{ top: 'calc(env(safe-area-inset-top) + 0.5rem)' }}
-      >
-        🔧
-      </button>
-      {aperto && dati && (
-        <div className="fixed inset-0 z-[201] bg-black/70 flex items-center justify-center p-4" onClick={() => setAperto(false)}>
-          <div className="bg-white rounded-xl p-4 max-w-sm w-full max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-bold text-slate-900">Diagnostica schermo</p>
-              <button onClick={() => setAperto(false)} className="text-slate-400"><X className="w-5 h-5" /></button>
-            </div>
-            <pre className="text-[10px] font-mono whitespace-pre-wrap break-all bg-slate-50 p-2 rounded-lg text-slate-700">
-              {JSON.stringify(dati, null, 1)}
-            </pre>
-            <button onClick={aggiorna} className="mt-3 w-full bg-slate-900 text-white text-xs font-semibold py-2 rounded-lg">
-              Aggiorna
-            </button>
-          </div>
-        </div>
-      )}
-    </>
-  );
 }
 
 function ToastHost() {
@@ -5443,7 +5569,6 @@ function App() {
   return (
     <div className="h-app-viewport flex bg-[#eef1f5] lg:bg-slate-50 overflow-hidden">
       <ToastHost />
-      <DiagnosticaPanel />
       <Sidebar
         currentPage={currentPage}
         setCurrentPage={goToPage}
