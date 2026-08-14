@@ -2833,6 +2833,8 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
   const [rincaroOre, setRincaroOre] = useState('8');
   const [rincaroTariffa, setRincaroTariffa] = useState('35');
   const [activeCat, setActiveCat] = useState(categorieCatalogo[0]);
+  const [activeSubCatalogo, setActiveSubCatalogo] = useState('Tutte');
+  const [queryCatalogoPreventivo, setQueryCatalogoPreventivo] = useState('');
   const [savedFlashId, setSavedFlashId] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
   const [previewView, setPreviewView] = useState('cliente'); // 'cliente' | 'interno'
@@ -2888,6 +2890,33 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
     ? subtotaleMateriali * ((parseFloat(rincaroPercent) || 0) / 100)
     : (parseFloat(rincaroOre) || 0) * (parseFloat(rincaroTariffa) || 0);
   const totale = subtotaleMateriali + subtotaleProdotti + subtotaleLavoro + rincaroValore;
+
+  // catalogo prodotti nel costruttore preventivo — stessa navigazione a
+  // cartelle + ricerca del Catalogo vero e proprio, ma con "+ Aggiungi" invece
+  // di modifica inline, e filtrato per la zona attiva
+  const prodottiZonaCategoria = prodotti.filter(p => p.categoria === activeCat && visibileInZona(p, zonaAttiva));
+  const sottocategorieCatalogoPreventivo = ['Tutte', ...new Set(prodottiZonaCategoria.map(p => p.sottocategoria).filter(Boolean))];
+  const ricercaCatalogoAttiva = queryCatalogoPreventivo.trim().length > 0;
+  const risultatiRicercaCatalogoPreventivo = ricercaCatalogoAttiva
+    ? (() => {
+        const q = queryCatalogoPreventivo.trim().toLowerCase();
+        return prodotti.filter(p => visibileInZona(p, zonaAttiva) && (
+          (p.nome || '').toLowerCase().includes(q) ||
+          (p.codice || '').toLowerCase().includes(q) ||
+          (p.descrizione || '').toLowerCase().includes(q) ||
+          (p.sottocategoria || '').toLowerCase().includes(q)
+        ));
+      })()
+    : [];
+  const mostraCartelleCatalogoPreventivo = !ricercaCatalogoAttiva && activeSubCatalogo === 'Tutte' && sottocategorieCatalogoPreventivo.length > 1;
+  const conteggioSottocategorieCatalogoPreventivo = sottocategorieCatalogoPreventivo
+    .filter(s => s !== 'Tutte')
+    .map(sub => ({ nome: sub, count: prodottiZonaCategoria.filter(p => p.sottocategoria === sub).length }));
+  const prodottiCatalogoPreventivo = ricercaCatalogoAttiva
+    ? risultatiRicercaCatalogoPreventivo
+    : prodottiZonaCategoria.filter(p => activeSubCatalogo === 'Tutte' || p.sottocategoria === activeSubCatalogo);
+  const prodottiCatalogoTecnici = prodottiCatalogoPreventivo.filter(p => p.categoria !== 'Bagno');
+  const prodottiCatalogoBagno = prodottiCatalogoPreventivo.filter(p => p.categoria === 'Bagno');
 
   const startNuovo = () => {
     setModificaId(null);
@@ -3892,47 +3921,148 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
               </div>
             </div>
 
-            {/* catalogo */}
+            {/* catalogo — stessa navigazione a cartelle + ricerca del Catalogo vero,
+                ma con "+ Aggiungi" invece di modifica inline */}
             <div className="app-card overflow-hidden">
-              <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
+              <div className="px-5 py-3.5 border-b border-slate-100 space-y-3">
                 <p className="text-sm font-semibold text-slate-900">Catalogo prodotti</p>
-                <div className="flex gap-1 overflow-x-auto">
-                  {[...new Set([...categorieCatalogo, ...prodotti.map(p => p.categoria).filter(Boolean)])].map(cat => (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={queryCatalogoPreventivo}
+                    onChange={(e) => setQueryCatalogoPreventivo(e.target.value)}
+                    placeholder="Cerca un prodotto per nome o codice..."
+                    className="w-full pl-9 pr-9 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                  />
+                  {ricercaCatalogoAttiva && (
                     <button
-                      key={cat}
-                      onClick={() => setActiveCat(cat)}
-                      className={`px-3 py-2.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${activeCat === cat ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-500'}`}
+                      type="button"
+                      onClick={() => setQueryCatalogoPreventivo('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-300 hover:text-slate-500"
                     >
-                      {cat}
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+                {!ricercaCatalogoAttiva && (
+                  <div className="flex gap-1 overflow-x-auto">
+                    {[...new Set([...categorieCatalogo, ...prodotti.map(p => p.categoria).filter(Boolean)])].map(cat => (
+                      <button
+                        key={cat}
+                        onClick={() => { setActiveCat(cat); setActiveSubCatalogo('Tutte'); }}
+                        className={`px-3 py-2.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${activeCat === cat ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-500'}`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {!ricercaCatalogoAttiva && activeSubCatalogo !== 'Tutte' && (
+                <button
+                  onClick={() => setActiveSubCatalogo('Tutte')}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900 px-5 pt-3"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  Tutte le sottocategorie di {activeCat}
+                </button>
+              )}
+
+              {mostraCartelleCatalogoPreventivo && (
+                <div className="divide-y divide-slate-50">
+                  {conteggioSottocategorieCatalogoPreventivo.map(({ nome, count }) => (
+                    <button
+                      key={nome}
+                      onClick={() => setActiveSubCatalogo(nome)}
+                      className="w-full flex items-center justify-between gap-3 px-5 py-3 text-left hover:bg-slate-50 active:bg-slate-100 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                          <ShoppingBag className="w-3.5 h-3.5 text-blue-600" />
+                        </div>
+                        <p className="text-[13px] font-semibold text-slate-900 truncate">{nome}</p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[11px] text-slate-400 font-medium whitespace-nowrap">{count} prodott{count === 1 ? 'o' : 'i'}</span>
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-300" />
+                      </div>
                     </button>
                   ))}
                 </div>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4">
-                {prodotti.filter(p => p.categoria === activeCat && visibileInZona(p, zonaAttiva)).length === 0 && (
-                  <p className="col-span-full text-xs text-slate-400 text-center py-6">Nessun prodotto per questa zona in questa categoria.</p>
-                )}
-                {prodotti.filter(p => p.categoria === activeCat && visibileInZona(p, zonaAttiva)).map(p => {
-                  const isAdded = !!carrello.find(i => i.id === p.id);
-                  return (
-                    <div key={p.id} className="border border-slate-200 rounded-xl overflow-hidden">
-                      <div className="h-16 bg-slate-50 flex items-center justify-center">
-                        <ImagePlus className="w-4 h-4 text-slate-300" />
-                      </div>
-                      <div className="p-2.5">
-                        <p className="text-[11px] font-semibold text-slate-900 leading-snug line-clamp-2 min-h-[28px]">{p.nome}</p>
-                        <p className="text-xs font-bold text-slate-900 mt-1">{fmtEuro(p.prezzo)}</p>
-                        <button
-                          onClick={() => toggleProdotto(p)}
-                          className={`w-full mt-2 text-[10px] font-bold py-1.5 rounded-lg transition-colors ${isAdded ? 'bg-slate-900 text-white' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
-                        >
-                          {isAdded ? '✓ Aggiunto' : '+ Aggiungi'}
-                        </button>
-                      </div>
+              )}
+
+              {!mostraCartelleCatalogoPreventivo && (
+                <>
+                  {ricercaCatalogoAttiva && (
+                    <p className="text-xs font-semibold text-slate-500 px-5 pt-3">
+                      {prodottiCatalogoPreventivo.length} risultat{prodottiCatalogoPreventivo.length === 1 ? 'o' : 'i'} per "{queryCatalogoPreventivo.trim()}"
+                    </p>
+                  )}
+
+                  {prodottiCatalogoTecnici.length > 0 && (
+                    <div className="divide-y divide-slate-50">
+                      {prodottiCatalogoTecnici.map((p) => {
+                        const isAdded = !!carrello.find(i => i.id === p.id);
+                        const misure = (p.misuraLunghezza || p.misuraProfondita || p.misuraAltezza)
+                          ? `${p.misuraLunghezza || '–'}×${p.misuraProfondita || '–'}×${p.misuraAltezza || '–'} cm`
+                          : null;
+                        const sottotitolo = [
+                          ricercaCatalogoAttiva ? p.sottocategoria : null,
+                          p.fornitore, p.codice, misure,
+                        ].filter(Boolean).join(' · ');
+                        return (
+                          <div key={p.id} className="pl-3.5 pr-4 py-3 border-l-[3px] border-blue-400 flex items-center justify-between gap-3">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[13px] font-semibold text-slate-900 truncate">{p.nome}</p>
+                              {sottotitolo && <p className="text-[11px] text-slate-400 truncate mt-0.5">{sottotitolo}</p>}
+                              <p className="text-sm font-semibold text-slate-900 mt-1">{fmtEuro(p.prezzo)}</p>
+                            </div>
+                            <button
+                              onClick={() => toggleProdotto(p)}
+                              className={`shrink-0 text-[11px] font-bold px-3 py-2 rounded-lg transition-colors ${isAdded ? 'bg-slate-900 text-white' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+                            >
+                              {isAdded ? '✓' : '+ Aggiungi'}
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
-                  );
-                })}
-              </div>
+                  )}
+
+                  {prodottiCatalogoBagno.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4">
+                      {prodottiCatalogoBagno.map(p => {
+                        const isAdded = !!carrello.find(i => i.id === p.id);
+                        return (
+                          <div key={p.id} className="border border-slate-200 rounded-xl overflow-hidden">
+                            <div className="h-16 bg-slate-50 flex items-center justify-center overflow-hidden">
+                              {p.fotoUrl ? <img src={p.fotoUrl} alt={p.nome} className="w-full h-full object-cover" /> : <ImagePlus className="w-4 h-4 text-slate-300" />}
+                            </div>
+                            <div className="p-2.5">
+                              <p className="text-[11px] font-semibold text-slate-900 leading-snug line-clamp-2 min-h-[28px]">{p.nome}</p>
+                              <p className="text-xs font-bold text-slate-900 mt-1">{fmtEuro(p.prezzo)}</p>
+                              <button
+                                onClick={() => toggleProdotto(p)}
+                                className={`w-full mt-2 text-[10px] font-bold py-1.5 rounded-lg transition-colors ${isAdded ? 'bg-slate-900 text-white' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+                              >
+                                {isAdded ? '✓ Aggiunto' : '+ Aggiungi'}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {prodottiCatalogoPreventivo.length === 0 && (
+                    <p className="text-xs text-slate-400 text-center py-6 px-5">
+                      {ricercaCatalogoAttiva ? 'Nessun prodotto trovato.' : 'Nessun prodotto per questa zona in questa categoria.'}
+                    </p>
+                  )}
+                </>
+              )}
             </div>
           </div>
 
@@ -4657,8 +4787,6 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
   const [newAltezza, setNewAltezza] = useState('');
   const [newSchedaUrl, setNewSchedaUrl] = useState('');
   const [newFotoFile, setNewFotoFile] = useState(null);
-  const [importMsg, setImportMsg] = useState(null); // { tipo, testo }
-  const [importing, setImporting] = useState(false);
   const [salvandoNuovo, setSalvandoNuovo] = useState(false);
   const [erroreNuovo, setErroreNuovo] = useState('');
   const [editingId, setEditingId] = useState(null);
@@ -4693,6 +4821,10 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
     .filter(s => s !== 'Tutte')
     .map(sub => ({ nome: sub, count: prodottiCategoria.filter(p => p.sottocategoria === sub).length }));
   const prodottiDaMostrare = ricercaAttiva ? risultatiRicerca : filtered;
+  // Bagno/Deghi resta il catalogo visivo a griglia con foto (per il cliente);
+  // il resto (materiale tecnico) è una lista compatta, meno scroll, più "da negozio"
+  const prodottiTecnici = prodottiDaMostrare.filter(p => p.categoria !== 'Bagno');
+  const prodottiBagno = prodottiDaMostrare.filter(p => p.categoria === 'Bagno');
 
   const fornitoreForm = newFornitore || fornitoreDiCategoria(activeCat) || FORNITORI_CATALOGO[0];
   const sottocategorieStruttura = CATALOGO_STRUTTURA[fornitoreForm]?.[activeCat] || [];
@@ -4797,76 +4929,8 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
     setCaricandoFotoId(null);
   };
 
-  // Import listino fornitore — legge un CSV/Excel esportato dall'area riservata
-  // del fornitore (Tecnomat, Deghi, IDM...) e aggiunge i prodotti al catalogo.
-  // il proprietario lo fa da solo, senza dover chiamare nessuno.
-  const importaCatalogo = (file) => {
-    if (!file) return;
-    setImporting(true);
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const testo = e.target.result;
-        const righe = testo.split('\n').map(r => r.trim()).filter(Boolean);
-        // formato atteso: Nome,Categoria,Sottocategoria,Tier,Prezzo
-        const nuovi = righe.slice(1).map((riga) => {
-          const cols = riga.split(',').map(c => c.trim());
-          return {
-            nome: cols[0] || 'Prodotto importato',
-            categoria: cols[1] || activeCat,
-            sottocategoria: cols[2] || 'Generico',
-            tier: cols[3] || 'Standard',
-            prezzo: parseFloat(cols[4]) || 0,
-          };
-        }).filter(p => p.nome !== 'Prodotto importato' || righe.length > 1);
-
-        if (nuovi.length > 0) {
-          const { data, error } = await sb.from('prodotti').insert(nuovi.map(prodottoToRow)).select();
-          if (error) throw error;
-          setProdotti(prev => [...data.map(prodottoFromRow), ...prev]);
-          setImportMsg({ tipo: 'ok', testo: `${nuovi.length} prodotti importati dal listino.` });
-        } else {
-          setImportMsg({ tipo: 'err', testo: 'Il file non contiene righe valide. Usa il formato: Nome,Categoria,Sottocategoria,Qualità,Prezzo' });
-        }
-      } catch (err) {
-        setImportMsg({ tipo: 'err', testo: 'Non sono riuscito a leggere il file. Controlla il formato ed riprova.' });
-      }
-      setImporting(false);
-      setTimeout(() => setImportMsg(null), 5000);
-    };
-    reader.readAsText(file);
-  };
-
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5 flex-1 flex flex-col min-h-0">
-
-      {/* Aggiorna catalogo — import autonomo del listino fornitore */}
-      <div className="app-card p-4 flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-start gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-            <Download className="w-[18px] h-[18px] text-blue-600" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-900">Aggiorna catalogo dal fornitore</p>
-            <p className="text-xs text-slate-400 mt-0.5">File CSV esportato dall'area riservata del fornitore</p>
-          </div>
-        </div>
-        <label className={`shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2.5 rounded-lg cursor-pointer transition-colors ${importing ? 'bg-slate-100 text-slate-400' : 'bg-slate-900 hover:bg-slate-800 text-white'}`}>
-          {importing ? 'Importazione...' : 'Carica listino'}
-          <input
-            type="file"
-            accept=".csv,.txt"
-            className="hidden"
-            disabled={importing}
-            onChange={(e) => { if (e.target.files[0]) importaCatalogo(e.target.files[0]); e.target.value = ''; }}
-          />
-        </label>
-      </div>
-      {importMsg && (
-        <div className={`px-4 py-2.5 rounded-lg text-xs font-semibold ${importMsg.tipo === 'ok' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
-          {importMsg.testo}
-        </div>
-      )}
 
       {/* ricerca diretta per nome/codice — cerca in tutto il catalogo, salta la navigazione */}
       <div className="flex items-center gap-2.5">
@@ -4947,19 +5011,22 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
           )}
 
           {mostraCartelle && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div className="app-card overflow-hidden divide-y divide-slate-50">
               {conteggioSottocategorie.map(({ nome, count }) => (
                 <button
                   key={nome}
                   onClick={() => setActiveSub(nome)}
-                  className="app-card p-4 flex flex-col items-start gap-2 text-left hover:border-blue-300 transition-colors"
+                  className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left hover:bg-slate-50 active:bg-slate-100 transition-colors"
                 >
-                  <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center">
-                    <ShoppingBag className="w-[18px] h-[18px] text-blue-600" />
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                      <ShoppingBag className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <p className="text-[13.5px] font-semibold text-slate-900 truncate">{nome}</p>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-[13px] font-semibold text-slate-900 leading-snug">{nome}</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">{count} prodott{count === 1 ? 'o' : 'i'}</p>
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    <span className="text-[11px] text-slate-400 font-medium whitespace-nowrap">{count} prodott{count === 1 ? 'o' : 'i'}</span>
+                    <ChevronRight className="w-4 h-4 text-slate-300" />
                   </div>
                 </button>
               ))}
@@ -5144,121 +5211,204 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
       )}
 
       {!mostraCartelle && (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {prodottiDaMostrare.map((p) => (
-          <div key={p.id} className="app-card overflow-hidden group">
-            <label className="h-28 bg-slate-50 flex flex-col items-center justify-center gap-1.5 relative cursor-pointer overflow-hidden">
-              {p.fotoUrl ? (
-                <img src={p.fotoUrl} alt={p.nome} className="w-full h-full object-cover" />
-              ) : (
-                <>
-                  <ImagePlus className="w-5 h-5 text-slate-300" />
-                  <span className="text-[10.5px] font-medium text-slate-400">Foto da aggiungere</span>
-                </>
-              )}
-              {caricandoFotoId === p.id && (
-                <div className="absolute inset-0 bg-white/80 flex items-center justify-center text-[11px] font-semibold text-slate-500">
-                  Carico...
-                </div>
-              )}
-              <div className={`absolute inset-0 bg-black/0 lg:group-hover:bg-black/25 transition-colors flex items-center justify-center ${p.fotoUrl ? 'opacity-0 lg:group-hover:opacity-100' : ''}`}>
-                {p.fotoUrl && <span className="text-white text-[11px] font-semibold">Cambia foto</span>}
-              </div>
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                disabled={caricandoFotoId === p.id}
-                onChange={(e) => { if (e.target.files[0]) cambiaFotoProdotto(p, e.target.files[0]); e.target.value = ''; }}
-              />
-              <span className={`absolute top-2 left-2 text-[10px] font-semibold px-2 py-1 rounded-full ${tierStyle[p.tier]}`}>
-                {p.tier}
-              </span>
-              <button
-                type="button"
-                onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteProdotto(p.id); }}
-                className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 text-slate-400 hover:text-red-500 flex items-center justify-center opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </label>
-            <div className="p-3.5">
-              {p.sottocategoria && <p className="text-[10px] font-semibold text-blue-500 uppercase tracking-wide mb-1">{p.sottocategoria}</p>}
-              {editingId === p.id ? (
-                <div className="space-y-1.5">
-                  <input
-                    autoFocus
-                    type="text"
-                    value={editNome}
-                    onChange={(e) => setEditNome(e.target.value)}
-                    className="w-full px-2 py-1 text-[13px] font-semibold bg-white border border-blue-300 rounded-md outline-none focus:ring-2 focus:ring-blue-500/30"
-                  />
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-slate-400 text-xs">€</span>
+        <>
+          {/* lista compatta — materiale tecnico, una riga per prodotto: meno scroll,
+              più "da negozio". Tocca il nome per modificare nome/prezzo/zona */}
+          {prodottiTecnici.length > 0 && (
+            <div className="app-card overflow-hidden divide-y divide-slate-50">
+              {prodottiTecnici.map((p) => {
+                const misure = (p.misuraLunghezza || p.misuraProfondita || p.misuraAltezza)
+                  ? `${p.misuraLunghezza || '–'}×${p.misuraProfondita || '–'}×${p.misuraAltezza || '–'} cm`
+                  : null;
+                const sottotitolo = [
+                  ricercaAttiva ? p.sottocategoria : null,
+                  p.fornitore, p.codice, misure,
+                ].filter(Boolean).join(' · ');
+                return (
+                  <div key={p.id} className="pl-3.5 pr-4 py-3.5 border-l-[3px] border-blue-400">
+                    {editingId === p.id ? (
+                      <div className="space-y-1.5">
+                        <input
+                          autoFocus
+                          type="text"
+                          value={editNome}
+                          onChange={(e) => setEditNome(e.target.value)}
+                          className="w-full px-2 py-1 text-[13px] font-semibold bg-white border border-blue-300 rounded-md outline-none focus:ring-2 focus:ring-blue-500/30"
+                        />
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-slate-400 text-xs">€</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={editPrezzo}
+                            onChange={(e) => setEditPrezzo(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && confirmEditProdotto(p.id)}
+                            className="w-20 px-2 py-1 text-sm bg-white border border-blue-300 rounded-md outline-none focus:ring-2 focus:ring-blue-500/30"
+                          />
+                          <select
+                            value={p.zona || ''}
+                            onChange={(e) => aggiornaZonaProdotto(p.id, e.target.value)}
+                            className="text-xs text-slate-500 bg-white border border-slate-200 rounded-md px-2 py-1.5 outline-none focus:ring-2 focus:ring-blue-500/30"
+                          >
+                            <option value="">Tutte le zone</option>
+                            {ZONE_AMBIENTI.map(z => <option key={z.id} value={z.id}>{z.nome}</option>)}
+                          </select>
+                          <button onClick={() => confirmEditProdotto(p.id)} className="text-emerald-600 hover:text-emerald-700">
+                            <Check className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => deleteProdotto(p.id)}
+                            className="ml-auto text-slate-300 hover:text-red-500 p-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between gap-3">
+                        <button onClick={() => startEditProdotto(p)} className="text-left min-w-0 flex-1 group/edit">
+                          <p className="text-[13px] font-semibold text-slate-900 truncate group-hover/edit:text-blue-600 transition-colors">{p.nome}</p>
+                          {sottotitolo && <p className="text-[11px] text-slate-400 truncate mt-0.5">{sottotitolo}</p>}
+                        </button>
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          <span className="text-base font-semibold text-slate-900 whitespace-nowrap">{fmtEuro(p.prezzo)}</span>
+                          <button
+                            type="button"
+                            onClick={() => deleteProdotto(p.id)}
+                            className="text-slate-300 hover:text-red-500 p-1"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* griglia con foto — Bagno/Deghi, catalogo visivo da mostrare al cliente */}
+          {prodottiBagno.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {prodottiBagno.map((p) => (
+                <div key={p.id} className="app-card overflow-hidden group">
+                  <label className="h-28 bg-slate-50 flex flex-col items-center justify-center gap-1.5 relative cursor-pointer overflow-hidden">
+                    {p.fotoUrl ? (
+                      <img src={p.fotoUrl} alt={p.nome} className="w-full h-full object-cover" />
+                    ) : (
+                      <>
+                        <ImagePlus className="w-5 h-5 text-slate-300" />
+                        <span className="text-[10.5px] font-medium text-slate-400">Foto da aggiungere</span>
+                      </>
+                    )}
+                    {caricandoFotoId === p.id && (
+                      <div className="absolute inset-0 bg-white/80 flex items-center justify-center text-[11px] font-semibold text-slate-500">
+                        Carico...
+                      </div>
+                    )}
+                    <div className={`absolute inset-0 bg-black/0 lg:group-hover:bg-black/25 transition-colors flex items-center justify-center ${p.fotoUrl ? 'opacity-0 lg:group-hover:opacity-100' : ''}`}>
+                      {p.fotoUrl && <span className="text-white text-[11px] font-semibold">Cambia foto</span>}
+                    </div>
                     <input
-                      type="text"
-                      inputMode="decimal"
-                      value={editPrezzo}
-                      onChange={(e) => setEditPrezzo(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && confirmEditProdotto(p.id)}
-                      className="w-20 px-2 py-1 text-sm bg-white border border-blue-300 rounded-md outline-none focus:ring-2 focus:ring-blue-500/30"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={caricandoFotoId === p.id}
+                      onChange={(e) => { if (e.target.files[0]) cambiaFotoProdotto(p, e.target.files[0]); e.target.value = ''; }}
                     />
-                    <button onClick={() => confirmEditProdotto(p.id)} className="text-emerald-600 hover:text-emerald-700">
-                      <Check className="w-4 h-4" />
+                    <span className={`absolute top-2 left-2 text-[10px] font-semibold px-2 py-1 rounded-full ${tierStyle[p.tier]}`}>
+                      {p.tier}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteProdotto(p.id); }}
+                      className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 text-slate-400 hover:text-red-500 flex items-center justify-center opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
+                  </label>
+                  <div className="p-3.5">
+                    {p.sottocategoria && <p className="text-[10px] font-semibold text-blue-500 uppercase tracking-wide mb-1">{p.sottocategoria}</p>}
+                    {editingId === p.id ? (
+                      <div className="space-y-1.5">
+                        <input
+                          autoFocus
+                          type="text"
+                          value={editNome}
+                          onChange={(e) => setEditNome(e.target.value)}
+                          className="w-full px-2 py-1 text-[13px] font-semibold bg-white border border-blue-300 rounded-md outline-none focus:ring-2 focus:ring-blue-500/30"
+                        />
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-400 text-xs">€</span>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={editPrezzo}
+                            onChange={(e) => setEditPrezzo(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && confirmEditProdotto(p.id)}
+                            className="w-20 px-2 py-1 text-sm bg-white border border-blue-300 rounded-md outline-none focus:ring-2 focus:ring-blue-500/30"
+                          />
+                          <button onClick={() => confirmEditProdotto(p.id)} className="text-emerald-600 hover:text-emerald-700">
+                            <Check className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button onClick={() => startEditProdotto(p)} className="text-left w-full group/edit">
+                        <p className="text-[13px] font-semibold text-slate-900 leading-snug min-h-[34px] group-hover/edit:text-blue-600 transition-colors">{p.nome}</p>
+                        <p className="text-base font-bold text-slate-900 mt-1.5">{fmtEuro(p.prezzo)}</p>
+                        {(p.fornitore || p.codice) && (
+                          <p className="text-[10px] text-slate-400 mt-1 font-mono truncate">
+                            {[p.fornitore, p.codice].filter(Boolean).join(' · ')}
+                          </p>
+                        )}
+                        {(p.misuraLunghezza || p.misuraProfondita || p.misuraAltezza) && (
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            {p.misuraLunghezza || '–'}×{p.misuraProfondita || '–'}×{p.misuraAltezza || '–'} cm
+                          </p>
+                        )}
+                      </button>
+                    )}
+                    {p.descrizione && (
+                      <p className="text-[11px] text-slate-500 mt-1.5 line-clamp-2">{p.descrizione}</p>
+                    )}
+                    {p.schedaTecnicaUrl && (
+                      <a
+                        href={p.schedaTecnicaUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-[10px] text-blue-500 hover:text-blue-600 mt-1 inline-block"
+                      >
+                        Scheda tecnica →
+                      </a>
+                    )}
+                    <select
+                      value={p.zona || ''}
+                      onChange={(e) => aggiornaZonaProdotto(p.id, e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-2 w-full text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-md px-2 py-2 outline-none focus:ring-2 focus:ring-blue-500/30"
+                    >
+                      <option value="">Tutte le zone</option>
+                      {ZONE_AMBIENTI.map(z => <option key={z.id} value={z.id}>{z.nome}</option>)}
+                    </select>
                   </div>
                 </div>
-              ) : (
-                <button onClick={() => startEditProdotto(p)} className="text-left w-full group/edit">
-                  <p className="text-[13px] font-semibold text-slate-900 leading-snug min-h-[34px] group-hover/edit:text-blue-600 transition-colors">{p.nome}</p>
-                  <p className="text-base font-bold text-slate-900 mt-1.5">{fmtEuro(p.prezzo)}</p>
-                  {(p.fornitore || p.codice) && (
-                    <p className="text-[10px] text-slate-400 mt-1 font-mono truncate">
-                      {[p.fornitore, p.codice].filter(Boolean).join(' · ')}
-                    </p>
-                  )}
-                  {(p.misuraLunghezza || p.misuraProfondita || p.misuraAltezza) && (
-                    <p className="text-[10px] text-slate-400 mt-1">
-                      {p.misuraLunghezza || '–'}×{p.misuraProfondita || '–'}×{p.misuraAltezza || '–'} cm
-                    </p>
-                  )}
-                </button>
-              )}
-              {p.descrizione && (
-                <p className="text-[11px] text-slate-500 mt-1.5 line-clamp-2">{p.descrizione}</p>
-              )}
-              {p.schedaTecnicaUrl && (
-                <a
-                  href={p.schedaTecnicaUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="text-[10px] text-blue-500 hover:text-blue-600 mt-1 inline-block"
-                >
-                  Scheda tecnica →
-                </a>
-              )}
-              <select
-                value={p.zona || ''}
-                onChange={(e) => aggiornaZonaProdotto(p.id, e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                className="mt-2 w-full text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-md px-2 py-2 outline-none focus:ring-2 focus:ring-blue-500/30"
-              >
-                <option value="">Tutte le zone</option>
-                {ZONE_AMBIENTI.map(z => <option key={z.id} value={z.id}>{z.nome}</option>)}
-              </select>
+              ))}
             </div>
-          </div>
-        ))}
-        {prodottiDaMostrare.length === 0 && (
-          <div className="sm:col-span-2 lg:col-span-3 app-card py-14 flex flex-col items-center justify-center text-center">
-            <ShoppingBag className="w-7 h-7 text-slate-300 mb-2" />
-            <p className="text-sm text-slate-400">
-              {prodottiLoading ? 'Caricamento catalogo...' : ricercaAttiva ? 'Nessun prodotto trovato.' : 'Nessun prodotto in questa categoria.'}
-            </p>
-          </div>
-        )}
-      </div>
+          )}
+
+          {prodottiDaMostrare.length === 0 && (
+            <div className="app-card py-14 flex flex-col items-center justify-center text-center">
+              <ShoppingBag className="w-7 h-7 text-slate-300 mb-2" />
+              <p className="text-sm text-slate-400">
+                {prodottiLoading ? 'Caricamento catalogo...' : ricercaAttiva ? 'Nessun prodotto trovato.' : 'Nessun prodotto in questa categoria.'}
+              </p>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
