@@ -137,7 +137,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202608201400';
+const APP_VERSION = '202608201415';
 
 /* ============================================================
    GOOGLE CALENDAR (Fase 7) — modulo isolato e opzionale.
@@ -5856,15 +5856,25 @@ function DiagnosticaGap() {
     document.body.appendChild(probe);
     const safeBottom = getComputedStyle(probe).paddingBottom;
     document.body.removeChild(probe);
+    const body = document.body.getBoundingClientRect();
     setDati({
       windowInnerHeight: window.innerHeight,
       visualViewportHeight: window.visualViewport ? Math.round(window.visualViewport.height) : 'n/d',
+      visualViewportOffsetTop: window.visualViewport ? Math.round(window.visualViewport.offsetTop) : 'n/d',
       docClientHeight: document.documentElement.clientHeight,
       appHeightVar: getComputedStyle(document.documentElement).getPropertyValue('--app-height'),
       safeAreaInsetBottom: safeBottom,
       navBottom: navRect ? Math.round(navRect.bottom) : 'n/d',
       navTop: navRect ? Math.round(navRect.top) : 'n/d',
       gapSottoNav: navRect ? Math.round(window.innerHeight - navRect.bottom) : 'n/d',
+      bodyBottom: Math.round(body.bottom),
+      bodyHeight: Math.round(body.height),
+      // dimensioni FISICHE reali dello schermo, indipendenti da qualunque
+      // bug di misura del viewport — per capire se c'è uno scarto nascosto
+      screenHeightCss: window.screen.height,
+      screenWidthCss: window.screen.width,
+      devicePixelRatio: window.devicePixelRatio,
+      screenHeightVeraInPx: Math.round(window.screen.height * window.devicePixelRatio),
       standalone: window.navigator.standalone === true,
     });
   };
