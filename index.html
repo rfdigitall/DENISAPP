@@ -108,24 +108,15 @@ window.addEventListener('error', function (e) {
   if (b) { b.style.display = 'block'; b.textContent = 'Errore: ' + (e.message || e); }
 });
 (function syncAppHeight() {
-  // Su alcuni iPhone in modalità PWA installata, visualViewport/innerHeight
-  // riportano SOLO l'area "sicura" (schermo vero meno status bar meno home
-  // indicator), anche con viewport-fit=cover — misurato con dati reali dal
-  // telefono di Denis: schermo vero 956px, viewport riportato 894px, mancano
-  // esattamente i 62px di safe-area (top+bottom). Sommando qui le due
-  // safe-area (che l'app gestisce già da sola via env() dove serve, es. la
-  // status bar in alto) si ottiene l'altezza fisica vera, così la barra di
-  // navigazione in basso arriva davvero fino al bordo dello schermo.
-  var probe = document.createElement('div');
-  probe.style.cssText = 'position:fixed;top:0;left:0;visibility:hidden;pointer-events:none;' +
-    'padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);';
-  document.body.appendChild(probe);
+  // --app-height è impostata via JS (visualViewport): è l'unica misura
+  // affidabile su iPhone per evitare la striscia bianca sotto menu/barra.
+  // (Tentativo di sommare le safe-area per "estendere" oltre questa misura
+  // provato e SCARTATO: su iPhone reale la superficie disegnabile vera del
+  // WebView è esattamente questa, non di più — sommare altro spingeva la
+  // barra di navigazione fuori schermo, invisibile.)
   var set = function () {
     var h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-    var cs = getComputedStyle(probe);
-    var insetTop = parseFloat(cs.paddingTop) || 0;
-    var insetBottom = parseFloat(cs.paddingBottom) || 0;
-    document.documentElement.style.setProperty('--app-height', Math.round(h + insetTop + insetBottom) + 'px');
+    document.documentElement.style.setProperty('--app-height', Math.round(h) + 'px');
   };
   set();
   window.addEventListener('resize', set);
@@ -152,7 +143,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202608201415';
+const APP_VERSION = '202608201445';
 
 /* ============================================================
    GOOGLE CALENDAR (Fase 7) — modulo isolato e opzionale.
@@ -5860,69 +5851,6 @@ const pageConfig = {
 // pannello diagnostico TEMPORANEO — per misurare il gap sotto la barra di
 // navigazione con numeri reali dal telefono di Denis invece di indovinare.
 // Da togliere una volta risolto.
-function DiagnosticaGap() {
-  const [aperto, setAperto] = useState(false);
-  const [dati, setDati] = useState(null);
-  const misura = () => {
-    const nav = document.querySelector('.app-bottom-nav');
-    const navRect = nav ? nav.getBoundingClientRect() : null;
-    const probe = document.createElement('div');
-    probe.style.cssText = 'position:fixed;bottom:0;left:0;padding-bottom:env(safe-area-inset-bottom);visibility:hidden;';
-    document.body.appendChild(probe);
-    const safeBottom = getComputedStyle(probe).paddingBottom;
-    document.body.removeChild(probe);
-    const body = document.body.getBoundingClientRect();
-    setDati({
-      windowInnerHeight: window.innerHeight,
-      visualViewportHeight: window.visualViewport ? Math.round(window.visualViewport.height) : 'n/d',
-      visualViewportOffsetTop: window.visualViewport ? Math.round(window.visualViewport.offsetTop) : 'n/d',
-      docClientHeight: document.documentElement.clientHeight,
-      appHeightVar: getComputedStyle(document.documentElement).getPropertyValue('--app-height'),
-      safeAreaInsetBottom: safeBottom,
-      navBottom: navRect ? Math.round(navRect.bottom) : 'n/d',
-      navTop: navRect ? Math.round(navRect.top) : 'n/d',
-      gapSottoNav: navRect ? Math.round(window.innerHeight - navRect.bottom) : 'n/d',
-      bodyBottom: Math.round(body.bottom),
-      bodyHeight: Math.round(body.height),
-      // dimensioni FISICHE reali dello schermo, indipendenti da qualunque
-      // bug di misura del viewport — per capire se c'è uno scarto nascosto
-      screenHeightCss: window.screen.height,
-      screenWidthCss: window.screen.width,
-      devicePixelRatio: window.devicePixelRatio,
-      screenHeightVeraInPx: Math.round(window.screen.height * window.devicePixelRatio),
-      standalone: window.navigator.standalone === true,
-    });
-  };
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => { setAperto(true); misura(); }}
-        className="fixed top-2 right-2 z-[200] w-9 h-9 rounded-full bg-red-600 text-white text-xs font-bold flex items-center justify-center shadow-lg"
-        style={{ top: 'calc(env(safe-area-inset-top) + 0.5rem)' }}
-      >
-        Δ
-      </button>
-      {aperto && dati && (
-        <div className="fixed inset-0 z-[201] bg-black/70 flex items-center justify-center p-4" onClick={() => setAperto(false)}>
-          <div className="bg-white rounded-xl p-4 max-w-sm w-full max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-bold text-slate-900">Diagnostica gap</p>
-              <button onClick={() => setAperto(false)} className="text-slate-400"><X className="w-5 h-5" /></button>
-            </div>
-            <pre className="text-[11px] font-mono whitespace-pre-wrap break-all bg-slate-50 p-2 rounded-lg text-slate-700">
-              {JSON.stringify(dati, null, 1)}
-            </pre>
-            <button onClick={misura} className="mt-3 w-full bg-slate-900 text-white text-xs font-semibold py-2 rounded-lg">
-              Aggiorna
-            </button>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
 // notifiche in-app al posto di alert() nativo — un popup del browser mostra
 // la barra degli indirizzi/i bottoni del sistema e rompe subito l'illusione
 // di app vera; questo resta dentro lo stile dell'app
@@ -6190,7 +6118,6 @@ function App() {
   return (
     <div className="h-app-viewport flex bg-[#eef1f5] lg:bg-slate-50 overflow-hidden min-h-0 max-h-full">
       <ToastHost />
-      <DiagnosticaGap />
       <Sidebar
         currentPage={currentPage}
         setCurrentPage={goToPage}
