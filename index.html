@@ -108,9 +108,24 @@ window.addEventListener('error', function (e) {
   if (b) { b.style.display = 'block'; b.textContent = 'Errore: ' + (e.message || e); }
 });
 (function syncAppHeight() {
+  // Su alcuni iPhone in modalità PWA installata, visualViewport/innerHeight
+  // riportano SOLO l'area "sicura" (schermo vero meno status bar meno home
+  // indicator), anche con viewport-fit=cover — misurato con dati reali dal
+  // telefono di Denis: schermo vero 956px, viewport riportato 894px, mancano
+  // esattamente i 62px di safe-area (top+bottom). Sommando qui le due
+  // safe-area (che l'app gestisce già da sola via env() dove serve, es. la
+  // status bar in alto) si ottiene l'altezza fisica vera, così la barra di
+  // navigazione in basso arriva davvero fino al bordo dello schermo.
+  var probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;top:0;left:0;visibility:hidden;pointer-events:none;' +
+    'padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);';
+  document.body.appendChild(probe);
   var set = function () {
     var h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-    document.documentElement.style.setProperty('--app-height', Math.round(h) + 'px');
+    var cs = getComputedStyle(probe);
+    var insetTop = parseFloat(cs.paddingTop) || 0;
+    var insetBottom = parseFloat(cs.paddingBottom) || 0;
+    document.documentElement.style.setProperty('--app-height', Math.round(h + insetTop + insetBottom) + 'px');
   };
   set();
   window.addEventListener('resize', set);
