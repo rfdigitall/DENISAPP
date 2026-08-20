@@ -59,9 +59,10 @@
     top: 0;
     bottom: auto;
   }
-  .app-bottom-nav {
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-  }
+  /* NB: niente padding-bottom con env(safe-area-inset-bottom) qui — Denis lo
+     vuole a filo come sul web, senza striscia bianca vuota sotto le icone.
+     Le icone/etichette sono comunque centrate dentro h-14 (56px), quindi
+     restano ben lontane dal bordo vero anche senza quel margine extra. */
   #errbox { display:none; padding:24px; font-family:monospace; font-size:13px; color:#b91c1c;
             background:#fef2f2; border:1px solid #fecaca; margin:24px; border-radius:8px;
             white-space:pre-wrap; }
@@ -136,7 +137,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202608201205';
+const APP_VERSION = '202608201400';
 
 /* ============================================================
    GOOGLE CALENDAR (Fase 7) — modulo isolato e opzionale.
