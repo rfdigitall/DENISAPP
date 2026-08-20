@@ -5841,6 +5841,62 @@ const pageConfig = {
   squadra: { title: 'Lavori Squadra', subtitle: null },
 };
 
+// pannello diagnostico TEMPORANEO — per misurare il gap sotto la barra di
+// navigazione con numeri reali dal telefono di Denis invece di indovinare.
+// Da togliere una volta risolto.
+function DiagnosticaGap() {
+  const [aperto, setAperto] = useState(false);
+  const [dati, setDati] = useState(null);
+  const misura = () => {
+    const nav = document.querySelector('.app-bottom-nav');
+    const navRect = nav ? nav.getBoundingClientRect() : null;
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position:fixed;bottom:0;left:0;padding-bottom:env(safe-area-inset-bottom);visibility:hidden;';
+    document.body.appendChild(probe);
+    const safeBottom = getComputedStyle(probe).paddingBottom;
+    document.body.removeChild(probe);
+    setDati({
+      windowInnerHeight: window.innerHeight,
+      visualViewportHeight: window.visualViewport ? Math.round(window.visualViewport.height) : 'n/d',
+      docClientHeight: document.documentElement.clientHeight,
+      appHeightVar: getComputedStyle(document.documentElement).getPropertyValue('--app-height'),
+      safeAreaInsetBottom: safeBottom,
+      navBottom: navRect ? Math.round(navRect.bottom) : 'n/d',
+      navTop: navRect ? Math.round(navRect.top) : 'n/d',
+      gapSottoNav: navRect ? Math.round(window.innerHeight - navRect.bottom) : 'n/d',
+      standalone: window.navigator.standalone === true,
+    });
+  };
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => { setAperto(true); misura(); }}
+        className="fixed top-2 right-2 z-[200] w-9 h-9 rounded-full bg-red-600 text-white text-xs font-bold flex items-center justify-center shadow-lg"
+        style={{ top: 'calc(env(safe-area-inset-top) + 0.5rem)' }}
+      >
+        Δ
+      </button>
+      {aperto && dati && (
+        <div className="fixed inset-0 z-[201] bg-black/70 flex items-center justify-center p-4" onClick={() => setAperto(false)}>
+          <div className="bg-white rounded-xl p-4 max-w-sm w-full max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-bold text-slate-900">Diagnostica gap</p>
+              <button onClick={() => setAperto(false)} className="text-slate-400"><X className="w-5 h-5" /></button>
+            </div>
+            <pre className="text-[11px] font-mono whitespace-pre-wrap break-all bg-slate-50 p-2 rounded-lg text-slate-700">
+              {JSON.stringify(dati, null, 1)}
+            </pre>
+            <button onClick={misura} className="mt-3 w-full bg-slate-900 text-white text-xs font-semibold py-2 rounded-lg">
+              Aggiorna
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // notifiche in-app al posto di alert() nativo — un popup del browser mostra
 // la barra degli indirizzi/i bottoni del sistema e rompe subito l'illusione
 // di app vera; questo resta dentro lo stile dell'app
@@ -6108,6 +6164,7 @@ function App() {
   return (
     <div className="h-app-viewport flex bg-[#eef1f5] lg:bg-slate-50 overflow-hidden min-h-0 max-h-full">
       <ToastHost />
+      <DiagnosticaGap />
       <Sidebar
         currentPage={currentPage}
         setCurrentPage={goToPage}
