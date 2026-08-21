@@ -143,7 +143,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202608201445';
+const APP_VERSION = '202608211240';
 
 /* ============================================================
    GOOGLE CALENDAR (Fase 7) — modulo isolato e opzionale.
@@ -1133,16 +1133,23 @@ async function generaPDFCliente({ cliente, carrello, diciture, totale, nextId, l
     }
   };
 
-  // anteprima cliente
+  // anteprima cliente — nome e indirizzo vanno a capo se troppo lunghi
+  // (es. indirizzo completo preso dall'autocomplete), invece di sconfinare
+  // fuori dal riquadro come segnalato dal cliente
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+  const righeNomeCliente = doc.splitTextToSize(cliente.nome, 78);
+  const righeIndirizzoCliente = doc.splitTextToSize(cliente.indirizzo, 78);
+  const righeMaxCliente = Math.max(righeNomeCliente.length, righeIndirizzoCliente.length, 1);
+  const altezzaBoxCliente = Math.max(20, 13 + (righeMaxCliente - 1) * 4.5 + 7);
   doc.setFillColor(243, 244, 246);
-  doc.roundedRect(12, y, 186, 20, 2, 2, 'F');
+  doc.roundedRect(12, y, 186, altezzaBoxCliente, 2, 2, 'F');
   doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(...SLATE5);
   doc.text('CLIENTE', 20, y+5);
   doc.text('CANTIERE', 110, y+5);
   doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...SLATE9);
-  doc.text(cliente.nome, 20, y+13);
-  doc.text(cliente.indirizzo, 110, y+13);
-  y += 26;
+  doc.text(righeNomeCliente, 20, y+13);
+  doc.text(righeIndirizzoCliente, 110, y+13);
+  y += altezzaBoxCliente + 6;
 
   // sezione DISEGNAZIONE LAVORI
   doc.setFillColor(...NAVY);
@@ -2705,7 +2712,7 @@ function IndirizzoAutocomplete({ value, onChange, placeholder, className }) {
     debounceRef.current = setTimeout(async () => {
       setCercando(true);
       try {
-        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=it&q=${encodeURIComponent(testo)}`;
+        const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=it&q=${encodeURIComponent(testo)}`;
         const res = await fetch(url, { headers: { 'Accept-Language': 'it' } });
         const data = await res.json();
         setSuggerimenti(Array.isArray(data) ? data : []);
@@ -2715,6 +2722,19 @@ function IndirizzoAutocomplete({ value, onChange, placeholder, className }) {
       }
       setCercando(false);
     }, 500);
+  };
+
+  // indirizzo corto (via + numero + città) invece del display_name intero di
+  // Nominatim, che incatena anche unione dei comuni/provincia/regione — pieno
+  // di dettagli che sul preventivo reale nessuno scrive e che mandavano in
+  // overflow la colonna CANTIERE nel PDF
+  const indirizzoCorto = (s) => {
+    const a = s.address || {};
+    const via = a.road || a.pedestrian || a.residential || '';
+    const citta = a.city || a.town || a.village || a.hamlet || a.county || '';
+    if (!via) return s.display_name;
+    const strada = a.house_number ? `${via} ${a.house_number}` : via;
+    return citta ? `${strada}, ${citta}` : strada;
   };
 
   return (
@@ -2738,7 +2758,7 @@ function IndirizzoAutocomplete({ value, onChange, placeholder, className }) {
               key={s.place_id}
               type="button"
               onMouseDown={(e) => e.preventDefault()}
-              onClick={() => { onChange(s.display_name); setSuggerimenti([]); setMostraSuggerimenti(false); }}
+              onClick={() => { onChange(indirizzoCorto(s)); setSuggerimenti([]); setMostraSuggerimenti(false); }}
               className="w-full text-left px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 border-b border-slate-50 last:border-0"
             >
               {s.display_name}
