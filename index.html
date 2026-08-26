@@ -126,6 +126,23 @@ window.addEventListener('error', function (e) {
     window.visualViewport.addEventListener('scroll', set);
   }
 })();
+(function fixTastieraIOS() {
+  // Bug segnalato da Denis: aprendo la tastiera su iPhone, il contenuto si
+  // "stacca" e resta un vuoto bianco sopra la barra in basso. Causa: WebKit
+  // sposta l'intera pagina (anche se position:fixed) per portare il campo
+  // sopra la tastiera — un comportamento nativo indipendente da --app-height.
+  // Fix noto per layout position:fixed su iOS: annullare quello scroll.
+  document.addEventListener('focusin', function (e) {
+    var t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) {
+      setTimeout(function () {
+        window.scrollTo(0, 0);
+        document.body.scrollTop = 0;
+        document.documentElement.scrollTop = 0;
+      }, 50);
+    }
+  });
+})();
 </script>
 
 <script type="text/babel" data-presets="react">
@@ -143,7 +160,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202608211240';
+const APP_VERSION = '202608252200';
 
 /* ============================================================
    GOOGLE CALENDAR (Fase 7) — modulo isolato e opzionale.
@@ -151,7 +168,7 @@ const APP_VERSION = '202608211240';
    Calendar" semplicemente non appare da nessuna parte: il resto
    dell'app funziona esattamente come prima, con o senza questo.
    ============================================================ */
-const GOOGLE_CALENDAR_CLIENT_ID = ''; // incolla qui il Client ID da Google Cloud Console
+const GOOGLE_CALENDAR_CLIENT_ID = '995993747787-len4utlhpr2lpbtnf2uu3ghhrc2ec136.apps.googleusercontent.com';
 
 let googleTokenClient = null;
 let googleAccessToken = null;
@@ -829,6 +846,20 @@ const Zap = makeIcon('Zap', [
   ['path', { d: 'M13 2 3 14h8l-1 8 10-12h-8l1-8z' }]
 ]);
 
+const Settings = makeIcon('Settings', [
+  ['path', { d: 'M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z' }],
+  ['circle', { cx: 12, cy: 12, r: 3 }],
+]);
+
+const GripVertical = makeIcon('GripVertical', [
+  ['circle', { cx: 9, cy: 5, r: 1 }],
+  ['circle', { cx: 9, cy: 12, r: 1 }],
+  ['circle', { cx: 9, cy: 19, r: 1 }],
+  ['circle', { cx: 15, cy: 5, r: 1 }],
+  ['circle', { cx: 15, cy: 12, r: 1 }],
+  ['circle', { cx: 15, cy: 19, r: 1 }],
+]);
+
 const CalendarIcon = makeIcon('CalendarIcon', [
   ['rect', { x: 3, y: 4, width: 18, height: 18, rx: 2, ry: 2 }],
   ['line', { x1: 16, y1: 2, x2: 16, y2: 6 }],
@@ -967,26 +998,36 @@ const CATEGORIE_DOCUMENTO_DEFAULT = [
   'OPERE IDRAULICHE E TERMOSANITARIE',
   'INSTALLAZIONE E COLLEGAMENTO IMPIANTO DI CLIMATIZZAZIONE',
   'PREDISPOSIZIONI, ASSISTENZA ELETTRICA E FINITURE',
+  'TRASFERTA E ALTRI COSTI',
 ];
 
-function categoriaDefaultVoce(item) {
-  // R2 #7: se la voce di lavoro viene dal mini-catalogo riutilizzabile, ha già
-  // una categoria scelta da Denis — usiamo quella invece di indovinare dalle parole
-  if (item.kind === 'lavoro' && item.categoriaDocumento) return item.categoriaDocumento;
-  const nome = (item.nome || '').toLowerCase();
-  if (item.kind === 'lavoro' && (nome.includes('smontaggio') || nome.includes('smaltimento') || nome.includes('demolizione') || nome.includes('rimozione'))) {
-    return 'SMANTELLAMENTO E SMALTIMENTO';
-  }
-  if (item.zona === 'centrale' || nome.includes('caldaia') || nome.includes('climatizzat')) {
-    return 'INSTALLAZIONE E COLLEGAMENTO IMPIANTO DI CLIMATIZZAZIONE';
-  }
-  if (nome.includes('elettric') || nome.includes('cavo') || nome.includes('presa') || nome.includes('placca') || nome.includes('interruttore') || nome.includes('scatola')) {
-    return 'PREDISPOSIZIONI, ASSISTENZA ELETTRICA E FINITURE';
-  }
-  return 'OPERE IDRAULICHE E TERMOSANITARIE';
+// R3 #5: manodopera specifica in base al tipo di materiale, invece di
+// "fornitura e posa in opera" ripetuto sempre uguale — la lista resta
+// volutamente prudente: solo le categorie dove la dicitura tecnica cambia
+// davvero, per non inventare descrizioni sbagliate sui materiali generici
+// (es. "palo telescopico" resta sul default, come nei preventivi reali di Denis)
+const MANODOPERA_PER_MATERIALE = [
+  { chiavi: ['quadro', 'centralino'], testo: 'Cablaggio e programmazione' },
+  { chiavi: ['rubinett', 'miscelatore', 'valvola'], testo: 'Posa e fissaggio' },
+  { chiavi: ['scaldabagno', 'caldaia', 'boiler'], testo: 'Installazione e collaudo' },
+  { chiavi: ['cavo', 'presa', 'interruttore', 'placca'], testo: 'Posa e collegamento' },
+  { chiavi: ['antenna', 'amplificatore', 'centrale multiutenze'], testo: 'Installazione e puntamento' },
+  { chiavi: ['fotocellul', 'motore per cancello', 'automazione'], testo: 'Installazione e collaudo' },
+];
+
+function manodoperaPerMateriale(nome) {
+  const n = (nome || '').toLowerCase();
+  const trovata = MANODOPERA_PER_MATERIALE.find(m => m.chiavi.some(k => n.includes(k)));
+  return trovata ? trovata.testo : 'Fornitura e posa in opera';
 }
 
 function dicituraDefaultVoce(item) {
+  if (item.kind === 'trasferta') {
+    const kmTxt = (item.km || 0).toLocaleString('it-IT');
+    const prezzoTxt = (item.prezzoKmUsato || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 });
+    const totaleTxt = (item.prezzoUnitario || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 });
+    return `Trasferta — ${kmTxt} km × ${prezzoTxt} €/km = ${totaleTxt} €.`;
+  }
   if (item.kind === 'lavoro') {
     const testo = item.nome.trim();
     const testoConMaiuscola = testo.charAt(0).toUpperCase() + testo.slice(1);
@@ -1013,32 +1054,22 @@ function dicituraDefaultVoce(item) {
     return smontaggio + frase;
   }
   if (item.kind === 'materiale' && item.unita) {
-    return `Fornitura e posa in opera di ${item.nome.toLowerCase()} (${item.qty} ${item.unita}).`;
+    return `${manodoperaPerMateriale(item.nome)} di ${item.nome.toLowerCase()} (${item.qty} ${item.unita}).`;
   }
   return `Fornitura e posa in opera di ${item.nome.toLowerCase()}.`;
 }
 
-// raggruppa il carrello per categoria documento, applicando eventuali
-// modifiche manuali salvate in "diciture" ({ [itemId]: { categoria, testo } })
-function raggruppaPerCategoria(carrello, diciture) {
-  const gruppi = new Map();
-  carrello.forEach(item => {
+// R3 #6: elenco nell'ordine scelto da Denis (quello del carrello, che parte
+// già dall'ordine in cui ha aggiunto le voci — smontaggio+prodotto+manodopera
+// vicini se li ha inseriti in sequenza — e può trascinare per aggiustare).
+// Non più raggruppato per categoria: un lavoro reale resta un blocco unico
+// invece di essere spezzato su sezioni diverse del documento.
+function elencoOrdinato(carrello, diciture) {
+  return carrello.map(item => {
     const override = diciture[item.id] || {};
-    const categoria = (override.categoria || categoriaDefaultVoce(item)).trim().toUpperCase() || 'ALTRI LAVORI';
     const testo = override.testo !== undefined ? override.testo : dicituraDefaultVoce(item);
-    if (!gruppi.has(categoria)) gruppi.set(categoria, []);
-    gruppi.get(categoria).push({ item, testo });
+    return { item, testo };
   });
-  // R2 #5: ordine automatico nel documento finale — smantellamento/smontaggio
-  // sempre prima, poi le opere, poi le finiture, indipendentemente dall'ordine
-  // in cui le voci sono state aggiunte al carrello
-  return [...gruppi.entries()]
-    .map(([categoria, righe]) => ({ categoria, righe }))
-    .sort((a, b) => {
-      const ia = CATEGORIE_DOCUMENTO_DEFAULT.indexOf(a.categoria);
-      const ib = CATEGORIE_DOCUMENTO_DEFAULT.indexOf(b.categoria);
-      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-    });
 }
 const oggiStr  = () => new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'short', year:'numeric' });
 
@@ -1158,21 +1189,17 @@ async function generaPDFCliente({ cliente, carrello, diciture, totale, nextId, l
   doc.text('DISEGNAZIONE LAVORI', 20, y+5.5);
   y += 13;
 
-  // corpo — voci raggruppate per categoria (tipo di intervento), niente prezzi
-  const gruppi = raggruppaPerCategoria(carrello, diciture || {});
-  gruppi.forEach(gruppo => {
-    nuovaPaginaSeServe(9);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(...SLATE9);
-    doc.text(gruppo.categoria, 12, y); y += 5;
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(80, 85, 92);
-    gruppo.righe.forEach(({ testo }) => {
-      const lines = doc.splitTextToSize(`• ${testo}`, 182);
-      nuovaPaginaSeServe(lines.length * 4.5);
-      doc.text(lines, 15, y);
-      y += lines.length * 4.5;
-    });
-    y += 3;
+  // corpo — voci nell'ordine scelto da Denis (drag & drop), niente prezzi,
+  // niente più sezioni per categoria: un lavoro reale (smontaggio+prodotto+
+  // manodopera) resta un blocco unico invece di essere spezzato
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(80, 85, 92);
+  elencoOrdinato(carrello, diciture || {}).forEach(({ testo }) => {
+    const lines = doc.splitTextToSize(`• ${testo}`, 182);
+    nuovaPaginaSeServe(lines.length * 4.5);
+    doc.text(lines, 15, y);
+    y += lines.length * 4.5;
   });
+  y += 3;
 
   nuovaPaginaSeServe(30);
 
@@ -1197,7 +1224,28 @@ async function generaPDFCliente({ cliente, carrello, diciture, totale, nextId, l
     doc.setPage(i);
     addFooterCliente(doc, i, totalePagine);
   }
-  doc.save(`Preventivo_${cliente.nome.replace(/\s/g,'_')}_${nextId}.pdf`);
+
+  // R3 #2: invio al cliente — se il telefono supporta la condivisione con
+  // file (iOS/Android), apre il menu nativo (Mail, WhatsApp...) con il PDF
+  // già pronto da allegare, invece di scaricarlo soltanto. Su desktop (o se
+  // il telefono non lo supporta) resta il download di sempre.
+  const nomeFile = `Preventivo_${cliente.nome.replace(/\s/g,'_')}_${nextId}.pdf`;
+  const blob = doc.output('blob');
+  const file = new File([blob], nomeFile, { type: 'application/pdf' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: `Preventivo ${nextId}`,
+        text: `Preventivo per ${cliente.nome} — Ferari Impianti`,
+      });
+      return;
+    } catch (err) {
+      if (err && err.name === 'AbortError') return; // Denis ha annullato la condivisione
+      // altrimenti prosegue con il download normale qui sotto
+    }
+  }
+  doc.save(nomeFile);
 }
 
 async function generaPDFInterno({ cliente, carrello, subMat, subProd, subLavoro, rincaro, totale, rincaroMode, rPct, rOre, rTar, nextId }) {
@@ -1742,6 +1790,7 @@ function Sidebar({ currentPage, setCurrentPage, onLogout, mobileOpen, onMobileCl
     { id: 'clienti', label: 'Clienti', icon: Users },
     { id: 'materiali', label: 'Materiali', icon: Package },
     { id: 'catalogo', label: 'Catalogo Prodotti', icon: ShoppingBag },
+    { id: 'impostazioni', label: 'Impostazioni', icon: Settings },
   ];
 
   const goTo = (id) => {
@@ -1910,9 +1959,9 @@ function MobileBottomNav({ currentPage, setCurrentPage }) {
   );
 }
 
-function PreventivoMobileList({ items, onSelect }) {
+function PreventivoMobileList({ items, onSelect, messaggioVuoto }) {
   if (!items.length) {
-    return <p className="md:hidden px-4 py-10 text-center text-sm text-slate-400">Nessun preventivo ancora.</p>;
+    return <p className="md:hidden px-4 py-10 text-center text-sm text-slate-400">{messaggioVuoto || 'Nessun preventivo ancora.'}</p>;
   }
   return (
     <div className="md:hidden divide-y divide-slate-100">
@@ -1977,12 +2026,10 @@ function StatCard({ label, value, delta, icon: Icon, accent }) {
 
 function DashboardCards({ preventivi, clienti }) {
   const valoreTotale = preventivi.reduce((s, p) => s + p.importo, 0);
-  const inAttesa = preventivi.filter(p => p.stato === 'In Attesa').length;
-  const inCorso = preventivi.filter(p => p.stato === 'In Corso').length;
   const manodoperaTotale = preventivi.reduce((s, p) => s + (p.importoManodopera || 0), 0);
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
       <StatCard
         label="Preventivi"
         value={String(preventivi.length)}
@@ -2002,18 +2049,6 @@ function DashboardCards({ preventivi, clienti }) {
         accent="bg-emerald-50 text-emerald-600"
       />
       <StatCard
-        label="In Attesa"
-        value={String(inAttesa)}
-        icon={Clock}
-        accent="bg-amber-50 text-amber-600"
-      />
-      <StatCard
-        label="Lavori in Corso"
-        value={String(inCorso)}
-        icon={Wrench}
-        accent="bg-indigo-50 text-indigo-600"
-      />
-      <StatCard
         label="Manodopera Netta"
         value={fmtEuro(manodoperaTotale)}
         icon={TrendingUp}
@@ -2024,22 +2059,79 @@ function DashboardCards({ preventivi, clienti }) {
 }
 
 /* ============================================================ */
+/* R3 #3: conteggio preventivi per stato — solo gli stati con     */
+/* preventivi in evidenza, il resto (sempre a 0) nascosto sotto   */
+/* "Altri stati" per non affollare la Home                        */
+/* ============================================================ */
+function StatoPill({ stato, conteggio, attivo, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-full text-xs font-semibold transition-all ${statoStyle[stato]} ${
+        attivo ? 'outline outline-2 outline-offset-1 outline-blue-500' : ''
+      }`}
+    >
+      <span className="font-bold">{conteggio}</span>
+      {stato}
+    </button>
+  );
+}
+
+function StatoBreakdown({ preventivi, statoFiltro, setStatoFiltro }) {
+  const [espanso, setEspanso] = useState(false);
+  const stati = Object.keys(statoStyle);
+  const conteggi = stati.map(stato => ({ stato, conteggio: preventivi.filter(p => p.stato === stato).length }));
+  const attivi = conteggi.filter(s => s.conteggio > 0);
+  const vuoti = conteggi.filter(s => s.conteggio === 0);
+
+  return (
+    <div className="app-card p-4 lg:p-5">
+      <div className="flex items-center gap-2 flex-wrap">
+        {attivi.length === 0 && <p className="text-xs text-slate-400">Nessun preventivo ancora.</p>}
+        {attivi.map(s => (
+          <StatoPill key={s.stato} {...s} attivo={statoFiltro === s.stato} onClick={() => setStatoFiltro(statoFiltro === s.stato ? null : s.stato)} />
+        ))}
+        {vuoti.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setEspanso(!espanso)}
+            className="flex items-center gap-1 pl-2.5 pr-2 py-1.5 rounded-full text-xs font-medium text-slate-400 border border-slate-200 hover:bg-slate-50 transition-colors"
+          >
+            Altri stati ({vuoti.length})
+            <ChevronRight className={`w-3 h-3 transition-transform ${espanso ? 'rotate-90' : ''}`} />
+          </button>
+        )}
+      </div>
+      {espanso && vuoti.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap mt-2 pt-2 border-t border-slate-100">
+          {vuoti.map(s => (
+            <StatoPill key={s.stato} {...s} attivo={statoFiltro === s.stato} onClick={() => setStatoFiltro(statoFiltro === s.stato ? null : s.stato)} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================ */
 /* TABELLA PREVENTIVI RECENTI                                     */
 /* ============================================================ */
 
-function PreventiviTable({ preventivi, onVediTutti }) {
-  const recenti = preventivi.slice(0, 6);
+function PreventiviTable({ preventivi, onVediTutti, statoFiltro }) {
+  const filtrati = statoFiltro ? preventivi.filter(p => p.stato === statoFiltro) : preventivi;
+  const recenti = statoFiltro ? filtrati : filtrati.slice(0, 6);
   return (
     <div className="app-card overflow-hidden lg:flex-1 lg:flex lg:flex-col">
       <div className="px-4 lg:px-5 py-4 flex items-center justify-between">
-        <h2 className="text-sm font-bold text-slate-900">Preventivi Recenti</h2>
+        <h2 className="text-sm font-bold text-slate-900">{statoFiltro ? `Preventivi — ${statoFiltro}` : 'Preventivi Recenti'}</h2>
         <button onClick={onVediTutti} className="flex items-center gap-1 text-xs font-bold text-blue-600 active:opacity-70">
           Vedi tutti
           <ChevronRight className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      <PreventivoMobileList items={recenti} onSelect={onVediTutti} />
+      <PreventivoMobileList items={recenti} onSelect={onVediTutti} messaggioVuoto={statoFiltro ? `Nessun preventivo con stato "${statoFiltro}".` : undefined} />
 
       <div className="hidden md:block overflow-x-auto border-t border-slate-100">
         <table className="w-full text-sm">
@@ -2075,7 +2167,7 @@ function PreventiviTable({ preventivi, onVediTutti }) {
               </tr>
             ))}
             {recenti.length === 0 && (
-              <tr><td colSpan="7" className="px-5 py-10 text-center text-sm text-slate-400">Nessun preventivo ancora.</td></tr>
+              <tr><td colSpan="7" className="px-5 py-10 text-center text-sm text-slate-400">{statoFiltro ? `Nessun preventivo con stato "${statoFiltro}".` : 'Nessun preventivo ancora.'}</td></tr>
             )}
           </tbody>
         </table>
@@ -2089,10 +2181,12 @@ function PreventiviTable({ preventivi, onVediTutti }) {
 /* ============================================================ */
 
 function DashboardPage({ preventivi, clienti, onVediTutti }) {
+  const [statoFiltro, setStatoFiltro] = useState(null);
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 lg:space-y-6 lg:flex-1 lg:flex lg:flex-col lg:min-h-0">
       <DashboardCards preventivi={preventivi} clienti={clienti} />
-      <PreventiviTable preventivi={preventivi} onVediTutti={onVediTutti} />
+      <StatoBreakdown preventivi={preventivi} statoFiltro={statoFiltro} setStatoFiltro={setStatoFiltro} />
+      <PreventiviTable preventivi={preventivi} onVediTutti={onVediTutti} statoFiltro={statoFiltro} />
     </div>
   );
 }
@@ -2214,6 +2308,25 @@ function ClientiPage({ clienti, setClienti, clientiLoading, preventivi, onNuovoP
     if (error) mostraToast('Errore nel rimuovere la foto: ' + error.message);
   };
 
+  // R3: elimina cliente — bloccato se ha preventivi collegati, per non
+  // orfanizzare dati reali per sbaglio (va prima eliminato ogni preventivo)
+  const eliminaCliente = async (cliente) => {
+    const preventiviCliente = preventivi.filter(p => p.clienteId === cliente.id);
+    if (preventiviCliente.length > 0) {
+      mostraToast(`Elimina prima i ${preventiviCliente.length} preventivi di questo cliente.`);
+      return;
+    }
+    if (!window.confirm(`Eliminare definitivamente il cliente "${cliente.nome}"? L'azione non si può annullare.`)) return;
+    const fotoDaRimuovere = fotoCliente.map(f => f.storagePath).filter(Boolean);
+    if (fotoDaRimuovere.length) sb.storage.from('cantiere-foto').remove(fotoDaRimuovere).catch(() => {});
+    const documentiDaRimuovere = documenti.map(d => d.storagePath).filter(Boolean);
+    if (documentiDaRimuovere.length) sb.storage.from('documenti-cliente').remove(documentiDaRimuovere).catch(() => {});
+    const { error } = await sb.from('clienti').delete().eq('id', cliente.id);
+    if (error) { mostraToast('Errore nell’eliminare il cliente: ' + error.message); return; }
+    setClienti(prev => prev.filter(c => c.id !== cliente.id));
+    setSelectedId(null);
+  };
+
   const filtered = clienti
     .filter(c => c.nome.toLowerCase().includes(search.toLowerCase()) || c.indirizzo.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => a.nome.localeCompare(b.nome));
@@ -2325,6 +2438,13 @@ function ClientiPage({ clienti, setClienti, clientiLoading, preventivi, onNuovoP
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => eliminaCliente(selected)}
+                className="flex items-center justify-center w-9 h-9 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+                aria-label="Elimina cliente"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
               <button
                 onClick={() => startEditInfo(selected)}
                 className="flex items-center gap-1.5 border border-slate-200 text-slate-500 hover:bg-slate-50 text-sm font-semibold px-3.5 py-2.5 rounded-lg transition-colors"
@@ -3010,9 +3130,92 @@ function NuovoClienteInline({ onSalva }) {
 }
 
 /* ============================================================ */
+/* R3 #6: lista voci trascinabile — riordina il documento cliente */
+/* con drag & drop (mouse e touch, via Pointer Events)            */
+/* ============================================================ */
+function ListaVociOrdinabile({ carrello, diciture, onTestoChange, onReorder }) {
+  const containerRef = useRef(null);
+  const [draggingId, setDraggingId] = useState(null);
+  const [dragY, setDragY] = useState(0);
+  const dragInfo = useRef({ startY: 0, rowHeight: 70 });
+
+  const righe = elencoOrdinato(carrello, diciture);
+
+  const iniziaTrascinamento = (index, clientY) => {
+    const container = containerRef.current;
+    const rowEl = container?.children[index];
+    dragInfo.current = { startY: clientY, rowHeight: rowEl ? rowEl.offsetHeight : 70 };
+    setDraggingId(righe[index].item.id);
+    setDragY(0);
+  };
+
+  useEffect(() => {
+    if (!draggingId) return;
+    const muovi = (clientY) => {
+      const { startY, rowHeight } = dragInfo.current;
+      const delta = clientY - startY;
+      const indiceAttuale = carrello.findIndex(i => i.id === draggingId);
+      const passi = Math.round(delta / rowHeight);
+      if (passi !== 0) {
+        const nuovoIndice = Math.min(Math.max(indiceAttuale + passi, 0), carrello.length - 1);
+        if (nuovoIndice !== indiceAttuale) {
+          const nuovoOrdine = [...carrello];
+          const [voceSpostata] = nuovoOrdine.splice(indiceAttuale, 1);
+          nuovoOrdine.splice(nuovoIndice, 0, voceSpostata);
+          onReorder(nuovoOrdine);
+          dragInfo.current.startY = clientY;
+        }
+      }
+      setDragY(clientY - dragInfo.current.startY);
+    };
+    const onMove = (e) => { e.preventDefault(); muovi(e.touches ? e.touches[0].clientY : e.clientY); };
+    const onEnd = () => { setDraggingId(null); setDragY(0); };
+    window.addEventListener('pointermove', onMove, { passive: false });
+    window.addEventListener('pointerup', onEnd);
+    window.addEventListener('pointercancel', onEnd);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onEnd);
+      window.removeEventListener('pointercancel', onEnd);
+    };
+  }, [draggingId, carrello, onReorder]);
+
+  return (
+    <ul ref={containerRef} className="space-y-2">
+      {righe.map(({ item, testo }, index) => {
+        const inTrascinamento = draggingId === item.id;
+        return (
+          <li
+            key={item.id}
+            style={inTrascinamento ? { transform: `translateY(${dragY}px)`, position: 'relative', zIndex: 10 } : undefined}
+            className={`flex gap-1.5 items-start rounded-md transition-shadow ${inTrascinamento ? 'bg-blue-50 shadow-lg' : ''}`}
+          >
+            <button
+              type="button"
+              onPointerDown={(e) => { e.preventDefault(); iniziaTrascinamento(index, e.clientY); }}
+              className="mt-1.5 text-slate-300 hover:text-slate-500 shrink-0 p-0.5 cursor-grab active:cursor-grabbing"
+              style={{ touchAction: 'none' }}
+              aria-label="Trascina per riordinare"
+            >
+              <GripVertical className="w-4 h-4" />
+            </button>
+            <textarea
+              value={testo}
+              onChange={(e) => onTestoChange(item.id, e.target.value)}
+              rows={2}
+              className="flex-1 bg-slate-50 border border-slate-200 rounded-md px-2 py-1.5 text-[11.5px] text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/30 resize-none"
+            />
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/* ============================================================ */
 /* PREVENTIVI PAGE                                               */
 /* ============================================================ */
-function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPreventivi, preventiviLoading, materiali, setMateriali, prodotti, vociLavoro, setVociLavoro, presetClienteId, onConsumePreset, presetDettaglioId, onConsumePresetDettaglio }) {
+function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPreventivi, preventiviLoading, materiali, setMateriali, prodotti, vociLavoro, setVociLavoro, prezzoKm, presetClienteId, onConsumePreset, presetDettaglioId, onConsumePresetDettaglio }) {
   const [mode, setMode] = useState('lista'); // 'lista' | 'nuovo' | 'dettaglio'
   const [clienteId, setClienteId] = useState(null);
   const [statoEditId, setStatoEditId] = useState(null); // id preventivo in cambio stato
@@ -3045,6 +3248,7 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
   const [rincaroPercent, setRincaroPercent] = useState('10');
   const [rincaroOre, setRincaroOre] = useState('8');
   const [rincaroTariffa, setRincaroTariffa] = useState('35');
+  const [kmTrasferta, setKmTrasferta] = useState('');
   const [activeCat, setActiveCat] = useState(categorieCatalogo[0]);
   const [activeSubCatalogo, setActiveSubCatalogo] = useState('Tutte');
   const [queryCatalogoPreventivo, setQueryCatalogoPreventivo] = useState('');
@@ -3059,7 +3263,6 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
   const [fotoDettaglio, setFotoDettaglio] = useState([]);
   const [diciture, setDiciture] = useState({}); // { [itemId]: { categoria, testo } } — Fase 4
 
-  const setCategoriaVoce = (itemId, categoria) => setDiciture(prev => ({ ...prev, [itemId]: { ...prev[itemId], categoria } }));
   const setTestoVoce = (itemId, testo) => setDiciture(prev => ({ ...prev, [itemId]: { ...prev[itemId], testo } }));
 
   // carica le foto del preventivo aperto in dettaglio
@@ -3099,10 +3302,36 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
   const subtotaleMateriali = carrello.filter(i => i.kind === 'materiale').reduce((s, i) => s + i.prezzoUnitario * i.qty, 0);
   const subtotaleProdotti = carrello.filter(i => i.kind === 'prodotto').reduce((s, i) => s + i.prezzoUnitario * i.qty, 0);
   const subtotaleLavoro = carrello.filter(i => i.kind === 'lavoro').reduce((s, i) => s + i.prezzoUnitario * i.qty, 0);
+  const subtotaleTrasferta = carrello.filter(i => i.kind === 'trasferta').reduce((s, i) => s + i.prezzoUnitario * i.qty, 0);
   const rincaroValore = rincaroMode === 'percent'
     ? subtotaleMateriali * ((parseFloat(rincaroPercent) || 0) / 100)
     : (parseFloat(rincaroOre) || 0) * (parseFloat(rincaroTariffa) || 0);
-  const totale = subtotaleMateriali + subtotaleProdotti + subtotaleLavoro + rincaroValore;
+  const totale = subtotaleMateriali + subtotaleProdotti + subtotaleLavoro + subtotaleTrasferta + rincaroValore;
+
+  // R3 #1: la riga "Trasferta" nel carrello si aggiorna da sola in base ai km
+  // e al prezzo al km impostato — un solo item fisso (id 'trasferta'), non se
+  // ne accumulano di duplicati cambiando i km
+  React.useEffect(() => {
+    const km = parseFloat((kmTrasferta || '0').replace(',', '.')) || 0;
+    const prezzo = parseFloat((prezzoKm || '0').replace(',', '.')) || 0;
+    const costo = Math.round(km * prezzo * 100) / 100;
+    setCarrello(prev => {
+      const esiste = prev.find(i => i.id === 'trasferta');
+      if (km <= 0) {
+        return esiste ? prev.filter(i => i.id !== 'trasferta') : prev;
+      }
+      const voce = {
+        id: 'trasferta', kind: 'trasferta', qty: 1, zona: 'generico',
+        nome: 'Trasferta',
+        meta: `${kmTrasferta} km × ${prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €/km`,
+        prezzoUnitario: costo,
+        categoriaDocumento: 'TRASFERTA E ALTRI COSTI',
+        km, prezzoKmUsato: prezzo,
+      };
+      if (esiste && esiste.prezzoUnitario === costo && esiste.meta === voce.meta) return prev;
+      return esiste ? prev.map(i => i.id === 'trasferta' ? voce : i) : [...prev, voce];
+    });
+  }, [kmTrasferta, prezzoKm]);
 
   // catalogo prodotti nel costruttore preventivo — stessa navigazione a
   // cartelle + ricerca del Catalogo vero e proprio, ma con "+ Aggiungi" invece
@@ -3140,6 +3369,7 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
     setRincaroPercent('10');
     setRincaroOre('8');
     setRincaroTariffa('35');
+    setKmTrasferta('');
     setZonaAttiva('generico');
     setFotoCantiere([]);
     setClienteSearch('');
@@ -3155,6 +3385,10 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
     setModificaDbId(p.dbId);
     setClienteId(p.clienteId);
     setCarrello(p.carrelloSnapshot || []);
+    // ripristina i km della trasferta salvata, altrimenti l'effetto che la
+    // tiene sincronizzata la cancellerebbe subito (km vuoto = nessuna trasferta)
+    const trasfertaSalvata = (p.carrelloSnapshot || []).find(i => i.kind === 'trasferta');
+    setKmTrasferta(trasfertaSalvata ? String(trasfertaSalvata.km).replace('.', ',') : '');
     setZonaAttiva((p.zone && p.zone[0]) || 'generico');
     setFotoCantiere([]);
     setDiciture(p.diciture || {});
@@ -3211,12 +3445,33 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
   // aggiunge un materiale mai visto prima: lo crea nel listino Supabase e
   // lo mette subito nel carrello di questo preventivo
   const aggiungiMaterialeAlVolo = async () => {
-    if (!nmNome.trim()) return;
+    const nomeDigitato = nmNome.trim();
+    if (!nomeDigitato) return;
+    // R3 #4: se un materiale con lo stesso nome esiste già nel listino, lo
+    // riusiamo invece di creare un duplicato — prima capitava perché non
+    // c'era nessun controllo (visto dal vivo: "Raccordo a pressare dritto
+    // 1/2\"" salvato due volte)
+    const giaEsistente = materiali.find(m => m.nome.trim().toLowerCase() === nomeDigitato.toLowerCase());
+    if (giaEsistente) {
+      setCarrello(prev => {
+        const inCarrello = prev.find(i => i.id === giaEsistente.id);
+        const qty = inCarrello ? inCarrello.qty + 1 : 1;
+        const nuovaVoce = {
+          id: giaEsistente.id, nome: giaEsistente.nome,
+          meta: `${qty} ${giaEsistente.unita} × ${giaEsistente.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €`,
+          prezzoUnitario: giaEsistente.prezzo, qty, kind: 'materiale', zona: zonaAttiva, unita: giaEsistente.unita,
+        };
+        return inCarrello ? prev.map(i => i.id === giaEsistente.id ? nuovaVoce : i) : [...prev, nuovaVoce];
+      });
+      mostraToast(`"${giaEsistente.nome}" era già nel listino — aggiunto da lì.`, 'info');
+      setNmNome(''); setNmUnita('m'); setNmPrezzo(''); setNmZona(''); setShowNuovoMateriale(false);
+      return;
+    }
     setNmSalvando(true);
     setNmErrore('');
     const prezzo = parseFloat((nmPrezzo || '0').replace(',', '.')) || 0;
     const { data, error } = await sb.from('materiali')
-      .insert(materialeToRow({ nome: nmNome.trim(), unita: nmUnita, prezzo, zona: nmZona }))
+      .insert(materialeToRow({ nome: nomeDigitato, unita: nmUnita, prezzo, zona: nmZona }))
       .select().single();
     setNmSalvando(false);
     if (error) {
@@ -3427,6 +3682,19 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
     setStatoEditId(null);
   };
 
+  // R3: elimina preventivo — le foto collegate spariscono in automatico dal db
+  // (cascade), ma i file nello storage vanno rimossi a mano
+  const eliminaPreventivo = async (p) => {
+    if (!window.confirm(`Eliminare definitivamente il preventivo ${p.id}? L'azione non si può annullare.`)) return;
+    const { data: fotoDaRimuovere } = await sb.from('foto').select('storage_path').eq('preventivo_id', p.dbId);
+    const paths = (fotoDaRimuovere || []).map(f => f.storage_path).filter(Boolean);
+    if (paths.length) sb.storage.from('cantiere-foto').remove(paths).catch(() => {});
+    const { error } = await sb.from('preventivi').delete().eq('id', p.dbId);
+    if (error) { mostraToast('Errore nell’eliminare il preventivo: ' + error.message); return; }
+    setPreventivi(prev => prev.filter(x => x.dbId !== p.dbId));
+    setMode('lista');
+  };
+
   const maxNum = Math.max(...preventivi.map(p => parseInt(p.id.replace('PV-', '')) || 0), 148);
   const numeroDocumento = 'PV-' + String(maxNum + 1).padStart(4, '0');
   const dataDocumento = new Date().toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -3631,13 +3899,22 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
             <ArrowLeft className="w-3.5 h-3.5" />
             Torna ai preventivi
           </button>
-          <button
-            onClick={() => iniziaModifica(p)}
-            className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800"
-          >
-            <Pencil className="w-3.5 h-3.5" />
-            Modifica preventivo
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => iniziaModifica(p)}
+              className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Modifica preventivo
+            </button>
+            <button
+              onClick={() => eliminaPreventivo(p)}
+              className="flex items-center justify-center w-7 h-7 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+              aria-label="Elimina preventivo"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         <div className="app-card px-6 py-5 flex items-center justify-between flex-wrap gap-3">
@@ -4274,6 +4551,29 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
               </div>
             </div>
 
+            {/* R3 #1: trasferta — km percorsi × prezzo al km (impostabile in Impostazioni) */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
+              <p className="text-sm font-semibold text-slate-900 mb-3">Trasferta</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm text-slate-600">Km percorsi (andata e ritorno)</p>
+                <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={kmTrasferta}
+                    onChange={(e) => setKmTrasferta(e.target.value)}
+                    placeholder="0"
+                    className="w-14 bg-transparent text-right text-sm font-mono outline-none"
+                  />
+                  <span className="text-slate-400 text-xs">km</span>
+                </div>
+              </div>
+              <div className="border-t border-slate-200 mt-3 pt-3 flex items-center justify-between">
+                <p className="text-xs font-semibold text-slate-500">Costo trasferta ({(parseFloat((prezzoKm || '0').replace(',', '.')) || 0).toLocaleString('it-IT', { minimumFractionDigits: 2 })} €/km)</p>
+                <p className="text-sm font-bold text-slate-900">{fmtEuro(Math.round(subtotaleTrasferta))}</p>
+              </div>
+            </div>
+
             {/* catalogo — stessa navigazione a cartelle + ricerca del Catalogo vero,
                 ma con "+ Aggiungi" invece di modifica inline */}
             <div className="app-card overflow-hidden">
@@ -4610,33 +4910,14 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
                   </div>
 
                   <div className="px-6 pb-5 space-y-4">
-                    {raggruppaPerCategoria(carrello, diciture).map(gruppo => (
-                      <div key={gruppo.categoria}>
-                        <p className="text-[12px] font-bold text-slate-900 uppercase tracking-wide">{gruppo.categoria}</p>
-                        <ul className="mt-1.5 space-y-2">
-                          {gruppo.righe.map(({ item, testo }) => (
-                            <li key={item.id}>
-                              <div className="flex gap-1.5 items-start">
-                                <span className="text-slate-300 mt-1.5 shrink-0">•</span>
-                                <textarea
-                                  value={testo}
-                                  onChange={(e) => setTestoVoce(item.id, e.target.value)}
-                                  rows={2}
-                                  className="flex-1 bg-slate-50 border border-slate-200 rounded-md px-2 py-1.5 text-[11.5px] text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/30 resize-none"
-                                />
-                              </div>
-                              <select
-                                value={(diciture[item.id]?.categoria || categoriaDefaultVoce(item)).trim().toUpperCase()}
-                                onChange={(e) => setCategoriaVoce(item.id, e.target.value)}
-                                className="mt-1 ml-4 text-[9.5px] text-slate-400 bg-transparent border border-slate-200 rounded px-1.5 py-0.5 outline-none max-w-[90%]"
-                              >
-                                {CATEGORIE_DOCUMENTO_DEFAULT.map(c => <option key={c} value={c}>{c}</option>)}
-                              </select>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
+                    {carrello.length > 0 && (
+                      <ListaVociOrdinabile
+                        carrello={carrello}
+                        diciture={diciture}
+                        onTestoChange={setTestoVoce}
+                        onReorder={setCarrello}
+                      />
+                    )}
                     {carrello.length === 0 && (
                       <p className="text-sm text-slate-400 text-center py-4">Nessuna voce ancora aggiunta.</p>
                     )}
@@ -5112,6 +5393,62 @@ function MaterialiPage({ materiali, setMateriali, materialiLoading }) {
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================ */
+/* IMPOSTAZIONI — R3 #1: prezzo al km per il calcolo trasferta    */
+/* ============================================================ */
+function ImpostazioniPage({ impostazioni, setImpostazioni }) {
+  const [prezzoKm, setPrezzoKm] = useState((impostazioni.prezzo_km || '0.45').toString().replace('.', ','));
+  const [salvando, setSalvando] = useState(false);
+  const [salvato, setSalvato] = useState(false);
+
+  const salva = async () => {
+    const valore = parseFloat((prezzoKm || '0').replace(',', '.'));
+    if (isNaN(valore) || valore < 0) {
+      mostraToast('Inserisci un prezzo al km valido.');
+      return;
+    }
+    setSalvando(true);
+    const { error } = await sb.from('impostazioni')
+      .upsert({ chiave: 'prezzo_km', valore: String(valore) });
+    setSalvando(false);
+    if (error) {
+      mostraToast('Errore nel salvare: ' + error.message);
+      return;
+    }
+    setImpostazioni(prev => ({ ...prev, prezzo_km: String(valore) }));
+    setSalvato(true);
+    setTimeout(() => setSalvato(false), 2000);
+  };
+
+  return (
+    <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
+      <div className="app-card p-5 max-w-md">
+        <p className="text-sm font-semibold text-slate-900 mb-1">Trasferta</p>
+        <p className="text-xs text-slate-400 mb-4">Usato per calcolare in automatico il costo del viaggio nei preventivi, in base ai km percorsi.</p>
+        <label className="block text-[11px] font-medium text-slate-500 mb-1">Prezzo al km (€)</label>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            inputMode="decimal"
+            value={prezzoKm}
+            onChange={(e) => setPrezzoKm(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && salva()}
+            placeholder="0,45"
+            className="w-32 px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+          />
+          <button
+            onClick={salva}
+            disabled={salvando}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60"
+          >
+            {salvando ? 'Salvo...' : salvato ? '✓ Salvato' : 'Salva'}
+          </button>
         </div>
       </div>
     </div>
@@ -5866,11 +6203,9 @@ const pageConfig = {
   materiali: { title: 'Materiali', subtitle: null },
   catalogo: { title: 'Catalogo', subtitle: null },
   squadra: { title: 'Lavori Squadra', subtitle: null },
+  impostazioni: { title: 'Impostazioni', subtitle: null },
 };
 
-// pannello diagnostico TEMPORANEO — per misurare il gap sotto la barra di
-// navigazione con numeri reali dal telefono di Denis invece di indovinare.
-// Da togliere una volta risolto.
 // notifiche in-app al posto di alert() nativo — un popup del browser mostra
 // la barra degli indirizzi/i bottoni del sistema e rompe subito l'illusione
 // di app vera; questo resta dentro lo stile dell'app
@@ -5901,6 +6236,18 @@ function ToastHost() {
       </div>
     </div>
   );
+}
+
+// esegue una query Supabase e, se fallisce (es. token non ancora rinnovato
+// all'avvio dell'app), ritenta un paio di volte con una breve pausa prima di
+// arrendersi — vedi commento sopra il caricamento della sessione in App()
+async function fetchConRetry(queryFn, tentativi = 3, attesaMs = 700) {
+  let risultato = await queryFn();
+  for (let i = 1; i < tentativi && risultato.error; i++) {
+    await new Promise(r => setTimeout(r, attesaMs * i));
+    risultato = await queryFn();
+  }
+  return risultato;
 }
 
 function App() {
@@ -5971,11 +6318,21 @@ function App() {
   const [prodottiLoading, setProdottiLoading] = useState(true);
   const [vociLavoro, setVociLavoro] = useState([]);
   const [vociLavoroLoading, setVociLavoroLoading] = useState(true);
+  const [impostazioni, setImpostazioni] = useState({ prezzo_km: '0.45' });
   const [preventivi, setPreventivi] = useState([]);
   const [preventiviLoading, setPreventiviLoading] = useState(true);
   const [presetClienteId, setPresetClienteId] = useState(null);
   const [presetDettaglioId, setPresetDettaglioId] = useState(null);
 
+  // BUG INTERMITTENTE risolto: all'avvio (soprattutto a freddo, dopo che
+  // l'app è rimasta chiusa un po') sb.auth.getSession() può restituire una
+  // sessione il cui token è scaduto — il rinnovo automatico di Supabase parte
+  // in background ma non è ancora finito. Le richieste dati partono comunque
+  // (la sessione "c'è"), falliscono con 401, e restano vuote per sempre
+  // perché session?.user?.id non cambia quando il token si rinnova (stesso
+  // utente), quindi gli useEffect di caricamento non si riattivano da soli.
+  // fetchConRetry ritenta la stessa richiesta un paio di volte con una breve
+  // pausa, dando al rinnovo il tempo di completarsi prima di arrendersi.
   useEffect(() => {
     sb.auth.getSession().then(({ data }) => setSession(data.session));
     // BUG CRITICO risolto: Supabase riprova a rinnovare la sessione da solo,
@@ -6008,7 +6365,7 @@ function App() {
     if (!session) return;
     let annullato = false;
     setClientiLoading(true);
-    sb.from('clienti').select('*').order('creato_il', { ascending: false }).then(({ data, error }) => {
+    fetchConRetry(() => sb.from('clienti').select('*').order('creato_il', { ascending: false })).then(({ data, error }) => {
       if (annullato) return;
       if (error) {
         console.error('Errore nel caricare i clienti da Supabase:', error);
@@ -6026,7 +6383,7 @@ function App() {
     if (!session) return;
     let annullato = false;
     setPreventiviLoading(true);
-    sb.from('preventivi').select('*').order('creato_il', { ascending: false }).then(({ data, error }) => {
+    fetchConRetry(() => sb.from('preventivi').select('*').order('creato_il', { ascending: false })).then(({ data, error }) => {
       if (annullato) return;
       if (error) {
         console.error('Errore nel caricare i preventivi da Supabase:', error);
@@ -6044,7 +6401,7 @@ function App() {
     if (!session) return;
     let annullato = false;
     setMaterialiLoading(true);
-    sb.from('materiali').select('*').order('nome', { ascending: true }).then(({ data, error }) => {
+    fetchConRetry(() => sb.from('materiali').select('*').order('nome', { ascending: true })).then(({ data, error }) => {
       if (annullato) return;
       if (error) {
         console.error('Errore nel caricare i materiali da Supabase:', error);
@@ -6062,7 +6419,7 @@ function App() {
     if (!session) return;
     let annullato = false;
     setProdottiLoading(true);
-    sb.from('prodotti').select('*').order('nome', { ascending: true }).then(({ data, error }) => {
+    fetchConRetry(() => sb.from('prodotti').select('*').order('nome', { ascending: true })).then(({ data, error }) => {
       if (annullato) return;
       if (error) {
         console.error('Errore nel caricare il catalogo da Supabase:', error);
@@ -6080,7 +6437,7 @@ function App() {
     if (!session) return;
     let annullato = false;
     setVociLavoroLoading(true);
-    sb.from('voci_lavoro').select('*').order('nome', { ascending: true }).then(({ data, error }) => {
+    fetchConRetry(() => sb.from('voci_lavoro').select('*').order('nome', { ascending: true })).then(({ data, error }) => {
       if (annullato) return;
       if (error) {
         console.error('Errore nel caricare le voci di lavoro da Supabase:', error);
@@ -6089,6 +6446,19 @@ function App() {
       }
       setVociLavoro(data.map(voceLavoroFromRow));
       setVociLavoroLoading(false);
+    });
+    return () => { annullato = true; };
+  }, [session?.user?.id]);
+
+  // impostazioni generali (R3 #1: prezzo al km) — chiave/valore, stesso pattern
+  useEffect(() => {
+    if (!session) return;
+    let annullato = false;
+    fetchConRetry(() => sb.from('impostazioni').select('*')).then(({ data, error }) => {
+      if (annullato || error || !data) return;
+      const mappa = {};
+      data.forEach(r => { mappa[r.chiave] = r.valore; });
+      setImpostazioni(prev => ({ ...prev, ...mappa }));
     });
     return () => { annullato = true; };
   }, [session?.user?.id]);
@@ -6198,6 +6568,7 @@ function App() {
             prodotti={prodotti}
             vociLavoro={vociLavoro}
             setVociLavoro={setVociLavoro}
+            prezzoKm={impostazioni.prezzo_km}
             presetClienteId={presetClienteId}
             onConsumePreset={() => setPresetClienteId(null)}
             presetDettaglioId={presetDettaglioId}
@@ -6216,6 +6587,7 @@ function App() {
         )}
         {currentPage === 'materiali' && <MaterialiPage materiali={materiali} setMateriali={setMateriali} materialiLoading={materialiLoading} />}
         {currentPage === 'catalogo' && <CatalogoPage prodotti={prodotti} setProdotti={setProdotti} prodottiLoading={prodottiLoading} />}
+        {currentPage === 'impostazioni' && <ImpostazioniPage impostazioni={impostazioni} setImpostazioni={setImpostazioni} />}
         {currentPage === 'squadra' && <SquadraPage preventivi={preventivi} clienti={clienti} />}
           </div>
         </main>
