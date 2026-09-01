@@ -1,0 +1,29 @@
+name: Keep Supabase alive
+
+# Il piano gratuito Supabase mette il progetto in pausa dopo 7 giorni senza
+# nessuna richiesta. Questo job fa una piccola richiesta di lettura ogni
+# 3 giorni, così il progetto resta sempre attivo — gratis, nessuna
+# manutenzione richiesta. La chiave usata è la "anon key" pubblica, la
+# stessa già presente in chiaro dentro index.html (protetta dalle regole
+# RLS di Supabase, non dal segreto della chiave).
+
+on:
+  schedule:
+    - cron: '0 6 */3 * *'  # ogni 3 giorni, alle 06:00 UTC
+  workflow_dispatch: {}    # permette anche di lanciarlo a mano da GitHub
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase
+        # Legge dalla tabella "impostazioni" con la anon key — le RLS la
+        # filtrano (torna sempre una lista vuota, normale), ma la richiesta
+        # arriva davvero al database Postgres del progetto: verificato a
+        # mano, risponde 200. Questo è ciò che conta come attività vera,
+        # non solo un ping alla rete di Supabase.
+        run: |
+          curl -sS -o /dev/null -w "Supabase risponde con codice: %{http_code}\n" \
+            "https://rxlrfkmmoqdowjzsipgj.supabase.co/rest/v1/impostazioni?select=chiave&limit=1" \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ4bHJma21tb3Fkb3dqenNpcGdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzNjkyMzUsImV4cCI6MjA5OTk0NTIzNX0.86OHaiTD7vyBkX-SgAlCFf0m4GxWobX26_Rz3oW2Ya8" \
+            --fail
