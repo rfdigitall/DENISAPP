@@ -195,7 +195,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202609012300';
+const APP_VERSION = '202609030000';
 
 /* ============================================================
    GOOGLE CALENDAR (Fase 7) — modulo isolato e opzionale.
@@ -3378,6 +3378,22 @@ function ListaVociOrdinabile({ carrello, diciture, onTestoChange, filtro }) {
   );
 }
 
+// versione sola-lettura della lista qui sopra, per l'anteprima di un
+// preventivo già salvato (schermata "dettaglio"): niente textarea editabili,
+// perché lì non si sta modificando nulla, solo controllando prima di inviare
+function ListaVociSoloLettura({ carrello, diciture, filtro }) {
+  const righe = elencoOrdinato(carrello, diciture).filter(filtro ? ({ item }) => filtro(item) : () => true);
+  return (
+    <ul className="space-y-2">
+      {righe.map(({ item, testo }) => (
+        <li key={item.id} className="w-full bg-slate-50 border border-slate-200 rounded-md px-2 py-1.5 text-[11.5px] text-slate-700 whitespace-pre-wrap">
+          {testo}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 // schermata a schermo intero dedicata solo al riordino — via libera dai
 // campi di testo e dagli altri controlli, così tenere premuto o toccare le
 // frecce non rischia di confondersi con nient'altro sullo schermo
@@ -3537,6 +3553,14 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
   const [errorePreventivo, setErrorePreventivo] = useState('');
   const [fotoDettaglio, setFotoDettaglio] = useState([]);
   const [diciture, setDiciture] = useState({}); // { [itemId]: { categoria, testo } } — Fase 4
+  // BUG DI SICUREZZA (segnalato da Denis su PV-0154 Dario Franchini): la
+  // schermata "dettaglio" di un preventivo già salvato generava il PDF
+  // direttamente al click, senza nessuna anteprima in mezzo — a differenza
+  // della schermata di creazione/modifica. È esattamente lì che si è potuto
+  // scaricare/inviare il PDF con le sezioni vuote senza che nessuno se ne
+  // accorgesse prima. Ora anche qui c'è un'anteprima obbligatoria.
+  const [showPreviewDett, setShowPreviewDett] = useState(false);
+  const [previewViewDett, setPreviewViewDett] = useState('cliente'); // 'cliente' | 'interno'
 
   const setTestoVoce = (itemId, testo) => setDiciture(prev => ({ ...prev, [itemId]: { ...prev[itemId], testo } }));
 
@@ -4282,6 +4306,9 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
     const rincaroDett = p?.importo && carrelloDett.length
       ? p.importo - carrelloDett.reduce((s, i) => s + i.prezzoUnitario * i.qty, 0)
       : 0;
+    const subMatDett = carrelloDett.filter(i => i.kind === 'materiale').reduce((s, i) => s + i.prezzoUnitario * i.qty, 0);
+    const subProdDett = carrelloDett.filter(i => i.kind === 'prodotto').reduce((s, i) => s + i.prezzoUnitario * i.qty, 0);
+    const subLavoroDett = carrelloDett.filter(i => i.kind === 'lavoro').reduce((s, i) => s + i.prezzoUnitario * i.qty, 0);
     if (!p) { setMode('lista'); return null; }
     return (
       <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5 max-w-3xl">
@@ -4391,31 +4418,215 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row gap-2.5">
-          <button
-            onClick={async () => {
-              if (!clienteDett) return;
-              await generaPDFCliente({ cliente: clienteDett, carrello: carrelloDett, diciture: p.diciture || {}, totale: p.importo, nextId: p.id, logoB64: LOGO_TRASPARENTE_BASE64 });
-            }}
-            className="app-ripple flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
-          >
-            <Download className="w-4 h-4" />
-            PDF per il Cliente
-          </button>
-          <button
-            onClick={async () => {
-              if (!clienteDett) return;
-              const subMat = carrelloDett.filter(i => i.kind === 'materiale').reduce((s, i) => s + i.prezzoUnitario * i.qty, 0);
-              const subProd = carrelloDett.filter(i => i.kind === 'prodotto').reduce((s, i) => s + i.prezzoUnitario * i.qty, 0);
-              const subLavoro = carrelloDett.filter(i => i.kind === 'lavoro').reduce((s, i) => s + i.prezzoUnitario * i.qty, 0);
-              await generaPDFInterno({ cliente: clienteDett, carrello: carrelloDett, subMat, subProd, subLavoro, rincaro: rincaroDett, totale: p.importo, rincaroMode: 'percent', rPct: '10', rOre: '8', rTar: '35', nextId: p.id });
-            }}
-            className="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
-          >
-            <Download className="w-4 h-4" />
-            PDF Interno
-          </button>
-        </div>
+        <button
+          onClick={() => { setPreviewViewDett('cliente'); setShowPreviewDett(true); }}
+          disabled={carrelloDett.length === 0}
+          className="app-ripple w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+        >
+          <FileText className="w-4 h-4" />
+          Anteprima Documento
+        </button>
+
+        {showPreviewDett && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setShowPreviewDett(false)}></div>
+            <div className="relative bg-white rounded-t-2xl sm:rounded-2xl max-w-lg w-full max-h-[92vh] flex flex-col overflow-hidden">
+
+              <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between shrink-0">
+                <p className="text-sm font-semibold text-slate-900">Anteprima documento</p>
+                <button onClick={() => setShowPreviewDett(false)} className="text-slate-400 hover:text-slate-600">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="px-5 pt-3.5 pb-3 shrink-0">
+                <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
+                  <button
+                    onClick={() => setPreviewViewDett('interno')}
+                    className={`flex-1 text-xs font-bold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-1.5 ${previewViewDett === 'interno' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}
+                  >
+                    <Wrench className="w-3.5 h-3.5" />
+                    Per te e la tua squadra
+                  </button>
+                  <button
+                    onClick={() => setPreviewViewDett('cliente')}
+                    className={`flex-1 text-xs font-bold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-1.5 ${previewViewDett === 'cliente' ? 'bg-slate-900 text-white' : 'text-slate-500'}`}
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    Per il Cliente
+                  </button>
+                </div>
+                <p className="text-[10.5px] text-slate-400 text-center mt-2 leading-snug">
+                  {previewViewDett === 'interno'
+                    ? 'Lista materiali con prezzi unitari, per ordinare la merce.'
+                    : 'Quello che vede il cliente: lavori a blocchi, nessun prezzo unitario.'}
+                </p>
+              </div>
+
+              <div className="overflow-y-auto px-5 pb-5">
+
+                {previewViewDett === 'interno' && (
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                    <div className="bg-slate-900 px-5 py-3.5 flex items-center justify-between">
+                      <p className="text-white text-xs font-bold uppercase tracking-wide">Lista materiali da ordinare</p>
+                      <span className="text-[10px] text-slate-400 font-mono">uso interno</span>
+                    </div>
+                    <div className="px-5 py-2">
+                      {carrelloDett.length === 0 && (
+                        <p className="text-sm text-slate-400 text-center py-6">Nessuna voce presente.</p>
+                      )}
+                      {carrelloDett.map(item => (
+                        <div key={item.id} className="flex items-center justify-between gap-3 py-2.5 border-b border-slate-50 last:border-0">
+                          <div className="min-w-0">
+                            <p className="text-[12.5px] font-semibold text-slate-900 truncate">{item.nome}</p>
+                            <p className="text-[10.5px] text-slate-400 truncate">{item.meta}</p>
+                          </div>
+                          <span className="font-mono text-[12.5px] font-bold text-slate-900 shrink-0">{fmtEuro(Math.round(item.prezzoUnitario * item.qty))}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="px-5 py-3 flex items-center justify-between border-t border-slate-100">
+                      <span className="text-xs font-semibold text-slate-500">Subtotale materiali, prodotti e lavori</span>
+                      <span className="font-mono text-sm font-bold text-slate-900">{fmtEuro(Math.round(subMatDett + subProdDett + subLavoroDett))}</span>
+                    </div>
+                    <div className="px-5 py-3 flex items-center justify-between border-t border-slate-100">
+                      <span className="text-xs font-semibold text-slate-500">Manodopera / rincaro applicato</span>
+                      <span className="font-mono text-sm font-bold text-slate-900">{fmtEuro(Math.round(rincaroDett))}</span>
+                    </div>
+                    <div className="bg-slate-900 px-5 py-4 flex items-center justify-between">
+                      <span className="text-sm font-semibold text-slate-300">Totale reale</span>
+                      <span className="text-xl font-extrabold text-white">{fmtEuro(Math.round(p.importo))}</span>
+                    </div>
+                    <div className="bg-amber-50 border-t border-amber-100 px-5 py-3">
+                      <p className="text-[10.5px] text-amber-700 leading-relaxed">
+                        Questa vista non va mai inviata al cliente: serve solo a te e alla tua squadra per gli ordini.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {previewViewDett === 'cliente' && (
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                    <div className="bg-[#10133a] px-6 pt-7 pb-10 rounded-b-[40%] flex items-center gap-3">
+                      <img src={LOGO_BASE64} alt="Ferari Impianti" className="w-14 h-14 rounded-xl shrink-0" />
+                      <p className="text-white text-lg font-bold tracking-tight">PREVENTIVO</p>
+                    </div>
+
+                    <div className="px-6 -mt-5">
+                      <div className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex items-center justify-between shadow-sm">
+                        <div>
+                          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Data preventivo</p>
+                          <p className="text-sm font-bold text-slate-900 mt-0.5">{p.data}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Numero</p>
+                          <p className="text-sm font-bold text-slate-900 mt-0.5">{p.id}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {carrelloDett.filter(i => i.kind === 'materiale' || i.kind === 'prodotto').length > 0 && (
+                      <>
+                        <div className="px-6 pt-5 pb-2">
+                          <div className="bg-[#10133a] text-white text-xs font-bold px-3 py-2 rounded-lg uppercase tracking-wide inline-block">
+                            Materiale
+                          </div>
+                        </div>
+                        <div className="px-6 pb-3">
+                          <ListaVociSoloLettura
+                            carrello={carrelloDett}
+                            diciture={p.diciture || {}}
+                            filtro={(item) => item.kind === 'materiale' || item.kind === 'prodotto'}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {carrelloDett.filter(i => i.kind === 'lavoro').length > 0 && (
+                      <>
+                        <div className="px-6 pt-2 pb-2">
+                          <div className="bg-[#10133a] text-white text-xs font-bold px-3 py-2 rounded-lg uppercase tracking-wide inline-block">
+                            Designazione lavori
+                          </div>
+                        </div>
+                        <div className="px-6 pb-3">
+                          <ListaVociSoloLettura
+                            carrello={carrelloDett}
+                            diciture={p.diciture || {}}
+                            filtro={(item) => item.kind === 'lavoro'}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    <div className="px-6 pb-5 space-y-4">
+                      {carrelloDett.length === 0 && (
+                        <p className="text-sm text-slate-400 text-center py-4">Nessuna voce presente.</p>
+                      )}
+                      {fotoDettaglio.length > 0 && (
+                        <div className="pt-2 border-t border-slate-100">
+                          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-2">Documentazione fotografica ({fotoDettaglio.length})</p>
+                          <div className="grid grid-cols-6 gap-1.5">
+                            {fotoDettaglio.slice(0, 6).map(f => (
+                              <div key={f.id} className="aspect-square rounded-md overflow-hidden border border-slate-100">
+                                <img src={f.url} alt="" className="w-full h-full object-cover" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="px-6 pb-2">
+                      <p className="text-[10px] font-semibold text-slate-400 text-center uppercase tracking-wide">IVA non esposta</p>
+                    </div>
+                    <div className="px-6 pb-5">
+                      <div className="bg-[#10133a] text-white rounded-xl px-5 py-4 flex items-center justify-between">
+                        <span className="text-sm font-semibold">Totale</span>
+                        <span className="text-2xl font-extrabold">{fmtEuro(Math.round(p.importo))}</span>
+                      </div>
+                      <p className="text-[10px] font-semibold text-slate-500 text-center mt-2 uppercase tracking-wide">Il totale comprende materiale e manodopera</p>
+                    </div>
+
+                    <div className="bg-[#10133a] px-6 py-3">
+                      <p className="text-[9.5px] font-semibold text-center leading-relaxed uppercase tracking-wide" style={{ color: '#d4af5a' }}>
+                        Preventivo valido per 10 giorni dalla data di emissione, a causa di variazioni dei costi del materiale.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="px-5 py-4 border-t border-slate-100 shrink-0">
+                <div className="flex gap-2.5 mb-2.5">
+                  <button
+                    onClick={async () => {
+                      if (!clienteDett) return;
+                      await generaPDFCliente({ cliente: clienteDett, carrello: carrelloDett, diciture: p.diciture || {}, totale: p.importo, nextId: p.id, logoB64: LOGO_TRASPARENTE_BASE64 });
+                    }}
+                    className="app-ripple flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    PDF per il Cliente
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!clienteDett) return;
+                      await generaPDFInterno({ cliente: clienteDett, carrello: carrelloDett, subMat: subMatDett, subProd: subProdDett, subLavoro: subLavoroDett, rincaro: rincaroDett, totale: p.importo, rincaroMode: 'percent', rPct: '10', rOre: '8', rTar: '35', nextId: p.id });
+                    }}
+                    className="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    PDF Interno
+                  </button>
+                </div>
+                <button onClick={() => setShowPreviewDett(false)} className="w-full text-slate-400 text-xs py-2">
+                  ← Chiudi
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <GoogleCalendarButton
           titolo={`${clienteDett?.nome || p.cliente} — ${p.cantiere || 'Sopralluogo'}`}
