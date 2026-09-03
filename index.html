@@ -195,7 +195,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202609012200';
+const APP_VERSION = '202609012300';
 
 /* ============================================================
    GOOGLE CALENDAR (Fase 7) — modulo isolato e opzionale.
@@ -1247,13 +1247,21 @@ async function generaPDFCliente({ cliente, carrello, diciture, totale, nextId, l
 
   // corpo — voci nell'ordine scelto da Denis (frecce su/giù), niente prezzi,
   // niente più sezioni per categoria tecnica: un lavoro reale (smontaggio+
-  // prodotto) resta un blocco unico invece di essere spezzato
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(80, 85, 92);
+  // prodotto) resta un blocco unico invece di essere spezzato.
+  // BUG URGENTE (trovato dal PDF vero scaricato da Denis): "rigaSezione"
+  // imposta il testo bianco per scrivere sulla barra blu scura, ma non lo
+  // rimetteva mai grigio dopo — le righe sotto restavano bianco su bianco,
+  // quindi invisibili nel PDF anche se il contenuto c'era davvero (l'anteprima
+  // in-app non usa questi colori jsPDF, per questo sembrava tutto a posto lì).
+  const corpoNormale = () => { doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(80, 85, 92); };
+  corpoNormale();
   if (righeMateriale.length > 0) {
     rigaSezione('MATERIALE');
+    corpoNormale();
     righeMateriale.forEach(({ testo }) => {
       const lines = doc.splitTextToSize(`• ${testo}`, 182);
       nuovaPaginaSeServe(lines.length * 4.5);
+      corpoNormale();
       doc.text(lines, 15, y);
       y += lines.length * 4.5;
     });
@@ -1262,9 +1270,11 @@ async function generaPDFCliente({ cliente, carrello, diciture, totale, nextId, l
   if (righeLavori.length > 0) {
     nuovaPaginaSeServe(13);
     rigaSezione('DESIGNAZIONE LAVORI');
+    corpoNormale();
     righeLavori.forEach(({ testo }) => {
       const lines = doc.splitTextToSize(`• ${testo}`, 182);
       nuovaPaginaSeServe(lines.length * 4.5);
+      corpoNormale();
       doc.text(lines, 15, y);
       y += lines.length * 4.5;
     });
