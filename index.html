@@ -195,7 +195,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202609191100';
+const APP_VERSION = '202609211200';
 
 /* ============================================================
    GOOGLE CALENDAR (Fase 7) — modulo isolato e opzionale.
@@ -1581,46 +1581,53 @@ function ZonaIcon({ zonaId, className, size }) {
 
 /* Template lavori preimpostati — aprendo il template si aggiungono
    automaticamente le voci tipiche, poi l'utente aggiusta */
+// Solo 2 modelli, per i lavori grandi/complessi — su richiesta esplicita di
+// Denis ("per dei lavori piccoli non ha senso, conviene farli per quelli
+// grandi, così evitiamo di compilare 50 cose"). Dati presi da preventivi
+// reali già fatti (non inventati): bagno da PV-0150 (Giovanni Vitali),
+// elettrico dal preventivo di Wenbo Cai.
 const TEMPLATE_LAVORI = [
-  {
-    id: 't1', nome: 'Sostituzione Caldaia', zona: 'centrale',
-    materiali: [
-      { nome: 'Tubo Multistrato PE-X 20mm', categoria: 'Idraulica', unita: 'm', prezzo: 2.40, qty: 6 },
-      { nome: 'Raccordo a pressare dritto 1/2"', categoria: 'Idraulica', unita: 'pz', prezzo: 3.80, qty: 4 },
-      { nome: 'Collettore di distribuzione riscaldamento', categoria: 'Idraulica', unita: 'pz', prezzo: 118.00, qty: 1 },
-    ],
-    prodottoSuggerito: 'Caldaia a Condensazione Beretta 24kW',
-  },
   {
     id: 't2', nome: 'Rifacimento Bagno Completo', zona: 'bagno',
     materiali: [
-      { nome: 'Tubo Multistrato PE-X 20mm', categoria: 'Idraulica', unita: 'm', prezzo: 2.40, qty: 12 },
-      { nome: 'Raccordo a pressare dritto 1/2"', categoria: 'Idraulica', unita: 'pz', prezzo: 3.80, qty: 8 },
-      { nome: 'Isolante termico per tubazioni', categoria: 'Idraulica', unita: 'm', prezzo: 1.60, qty: 10 },
+      { nome: 'Lavabo sospeso 55 cm accessibile ceramica - Serie Selnova Comfort - Geberit', categoria: 'Bagno', unita: 'pz', prezzo: 94.00, qty: 1 },
+      { nome: 'Sanitari ergonomici 49 cm con copriwc scarico a pavimento', categoria: 'Bagno', unita: 'pz', prezzo: 184.00, qty: 1 },
+      { nome: 'Sifone di scarico tondo universale in ottone cromato', categoria: 'Idraulica', unita: 'pz', prezzo: 22.00, qty: 1 },
+      { nome: 'Coppia di miscelatori Jacuzzi - Bidet e lavabo per piletta click clack', categoria: 'Bagno', unita: 'pz', prezzo: 102.00, qty: 1 },
+      { nome: 'Set doccia esterno con flessibile cromato - Level di Paffoni', categoria: 'Bagno', unita: 'pz', prezzo: 38.00, qty: 1 },
+      { nome: 'Presa acqua a parete cromo per flessibile doccia - Jacuzzi', categoria: 'Bagno', unita: 'pz', prezzo: 8.00, qty: 1 },
+      { nome: 'Flessibile doccia Tecom Silver in PVC spiralato e estensibile', categoria: 'Bagno', unita: 'pz', prezzo: 6.90, qty: 1 },
+      { nome: 'Rubinetto lavatrice ECO M1/2"', categoria: 'Idraulica', unita: 'pz', prezzo: 4.10, qty: 1 },
+      { nome: 'Sifone lavatrice incasso OMP Calimero placca cromata - scarico 50mm', categoria: 'Idraulica', unita: 'pz', prezzo: 7.35, qty: 1 },
+      { nome: 'Sifone bidet Tecom ABS cromato', categoria: 'Idraulica', unita: 'pz', prezzo: 8.90, qty: 1 },
+      { nome: 'Canotto di allacciamento Geberit bianco per cassette incasso', categoria: 'Idraulica', unita: 'pz', prezzo: 15.85, qty: 1 },
     ],
-    prodottoSuggerito: 'Vaso WC Sospeso Geberit',
+    lavori: [
+      { nome: 'Smontaggio del vaso WC e smaltimento presso discarica autorizzata', categoria: 'SMANTELLAMENTO E SMALTIMENTO', prezzo: 0 },
+      { nome: 'Smontaggio del bidet e smaltimento presso discarica autorizzata', categoria: 'SMANTELLAMENTO E SMALTIMENTO', prezzo: 0 },
+      { nome: 'Smontaggio del lavabo e smaltimento presso discarica autorizzata', categoria: 'SMANTELLAMENTO E SMALTIMENTO', prezzo: 0 },
+    ],
   },
   {
-    id: 't3', nome: 'Impianto Elettrico Nuovo', zona: 'generico',
+    id: 't3', nome: 'Impianto Elettrico Nuovo Completo', zona: 'generico',
     materiali: [
-      { nome: 'Cavo elettrico FG16OR16 3x2.5', categoria: 'Elettrico', unita: 'm', prezzo: 1.90, qty: 30 },
-      { nome: 'Scatola di derivazione 503 Vimar', categoria: 'Elettrico', unita: 'pz', prezzo: 4.50, qty: 6 },
+      { nome: 'Cavo unipolare FS17 Baldassari CPR 1x6 mmq marrone matassa 100 m', categoria: 'Elettrico', unita: 'pz', prezzo: 99.00, qty: 2 },
+      { nome: 'Cavo FS17 2.5 mmq - matassa 100m', categoria: 'Elettrico', unita: 'pz', prezzo: 38.00, qty: 4 },
+      { nome: 'Cavo unipolare FS17 CPR 1x1,5 mmq blu matassa 100 m', categoria: 'Elettrico', unita: 'pz', prezzo: 25.50, qty: 7 },
+      { nome: 'Centralino Sartel incasso 12 moduli bianco con portello fumé IP40', categoria: 'Elettrico', unita: 'pz', prezzo: 9.80, qty: 1 },
+      { nome: 'Interruttore differenziale Schneider 2P 25A 30mA tipo A con riarmo automatico', categoria: 'Elettrico', unita: 'pz', prezzo: 115.00, qty: 1 },
+      { nome: 'Interruttore magnetotermico ABB differenziale 2P 16A 4,5KA curva C 0,03A', categoria: 'Elettrico', unita: 'pz', prezzo: 39.90, qty: 7 },
+      { nome: 'Interruttore magnetotermico ABB differenziale 2P 10A 4,5KA curva C 0,03A', categoria: 'Elettrico', unita: 'pz', prezzo: 39.90, qty: 2 },
+      { nome: 'Plafoniera stagna Lanzini Eco LED 38W 5500lm con emergenza', categoria: 'Elettrico', unita: 'pz', prezzo: 69.90, qty: 1 },
+      { nome: 'Interruttore Vimar Plana 1P 16A', categoria: 'Elettrico', unita: 'pz', prezzo: 6.40, qty: 15 },
+      { nome: 'Placca 3 moduli Vimar Plana bianco', categoria: 'Elettrico', unita: 'pz', prezzo: 9.60, qty: 31 },
+      { nome: 'Presa bipasso Vimar Plana 2P+T 10/16A', categoria: 'Elettrico', unita: 'pz', prezzo: 5.50, qty: 16 },
+      { nome: 'Supporto 3 moduli BTicino Matix', categoria: 'Elettrico', unita: 'pz', prezzo: 1.25, qty: 31 },
     ],
-    prodottoSuggerito: 'Placca Bticino Livinglight Bianca',
-  },
-  {
-    id: 't4', nome: 'Sostituzione Sanitari', zona: 'bagno',
-    materiali: [
-      { nome: 'Raccordo a pressare dritto 1/2"', categoria: 'Idraulica', unita: 'pz', prezzo: 3.80, qty: 3 },
+    lavori: [
+      { nome: 'Fornitura e posa in opera di N. 10 punti luce', categoria: 'PREDISPOSIZIONI, ASSISTENZA ELETTRICA E FINITURE', prezzo: 150.00 },
+      { nome: 'Fornitura N. 54 moduli ciechi per saturazione spazi vuoti', categoria: 'PREDISPOSIZIONI, ASSISTENZA ELETTRICA E FINITURE', prezzo: 90.00 },
     ],
-    prodottoSuggerito: 'Vaso WC Sospeso Geberit',
-  },
-  {
-    id: 't5', nome: 'Box Doccia Nuovo', zona: 'bagno',
-    materiali: [
-      { nome: 'Raccordo a pressare dritto 1/2"', categoria: 'Idraulica', unita: 'pz', prezzo: 3.80, qty: 2 },
-    ],
-    prodottoSuggerito: 'Box Doccia Cristallo Temperato 6mm',
   },
 ];
 
@@ -4007,6 +4014,27 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
           return [...prev, { id: prod.id, nome: prod.nome, meta: prod.tier, prezzoUnitario: prod.prezzo, qty: 1, kind: 'prodotto', zona: template.zona }];
         });
       }
+    }
+    // R6 (richiesto da Denis: "modelli solo per i lavori grandi, non per quelli
+    // piccoli, altrimenti si compilano 50 cose") — le voci di lavoro/manodopera
+    // del template si riusano dal mini-catalogo se già esistono (probabile,
+    // essendo frasi già usate su preventivi reali), altrimenti si creano lì
+    // così restano cercabili anche in futuro
+    for (const tl of template.lavori || []) {
+      if (carrello.find(i => i.kind === 'lavoro' && i.nome === tl.nome)) continue;
+      const esistente = vociLavoro.find(v => v.nome === tl.nome);
+      if (!esistente) {
+        const { data, error } = await sb.from('voci_lavoro')
+          .insert(voceLavoroToRow({ nome: tl.nome, categoria: tl.categoria, prezzo: tl.prezzo || 0 }))
+          .select().single();
+        if (!error && data) setVociLavoro(prev => [...prev, voceLavoroFromRow(data)]);
+      }
+      setCarrello(prev => [...prev, {
+        id: 'lavoro-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+        nome: tl.nome,
+        meta: tl.prezzo > 0 ? `Lavoro · ${tl.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €` : 'Lavoro',
+        prezzoUnitario: tl.prezzo || 0, qty: 1, kind: 'lavoro', zona: template.zona, categoriaDocumento: tl.categoria,
+      }]);
     }
   };
 
