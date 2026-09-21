@@ -195,7 +195,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202609030000';
+const APP_VERSION = '202609191100';
 
 /* ============================================================
    GOOGLE CALENDAR (Fase 7) — modulo isolato e opzionale.
@@ -340,28 +340,6 @@ function preventivoToRow(p) {
   return row;
 }
 
-function materialeFromRow(row) {
-  return {
-    id: row.id,
-    nome: row.nome,
-    unita: row.unita || '',
-    prezzo: Number(row.prezzo) || 0,
-    zona: row.zona || '',
-    ultimoAggiornamento: row.ultimo_aggiornamento
-      ? new Date(row.ultimo_aggiornamento).toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })
-      : '',
-  };
-}
-
-function materialeToRow(m) {
-  const row = {};
-  if (m.nome !== undefined) row.nome = m.nome;
-  if (m.unita !== undefined) row.unita = m.unita;
-  if (m.prezzo !== undefined) row.prezzo = m.prezzo;
-  if (m.zona !== undefined) row.zona = m.zona || null;
-  return row;
-}
-
 function voceLavoroFromRow(row) {
   return {
     id: row.id,
@@ -386,6 +364,7 @@ function prodottoFromRow(row) {
     categoria: row.categoria || '',
     sottocategoria: row.sottocategoria || '',
     tier: row.tier || 'Standard',
+    unita: row.unita || 'pz',
     prezzo: Number(row.prezzo) || 0,
     fornitore: row.fornitore || '',
     codice: row.codice || '',
@@ -406,6 +385,7 @@ function prodottoToRow(p) {
   if (p.categoria !== undefined) row.categoria = p.categoria;
   if (p.sottocategoria !== undefined) row.sottocategoria = p.sottocategoria;
   if (p.tier !== undefined) row.tier = p.tier;
+  if (p.unita !== undefined) row.unita = p.unita;
   if (p.prezzo !== undefined) row.prezzo = p.prezzo;
   if (p.fornitore !== undefined) row.fornitore = p.fornitore;
   if (p.codice !== undefined) row.codice = p.codice;
@@ -425,6 +405,65 @@ function prodottoToRow(p) {
 // taggate, restano visibili come prima
 function visibileInZona(voce, zonaAttiva) {
   return !voce.zona || voce.zona === 'generico' || voce.zona === zonaAttiva;
+}
+
+// R6 (segnalato da Denis/Deborah dopo il test cronometrato: "cavo 6" o
+// "centralino 12" davano 0 risultati perché il nome reale ha un ordine o
+// un formato diverso) — ricerca "a parole", non a frase intera: ogni
+// parola scritta deve trovarsi da qualche parte nel testo, in qualsiasi
+// ordine, senza badare ad accenti o maiuscole. Così "cavo 6" trova anche
+// "Cavo unipolare FS17 ... 1x6 mmq ..." invece di dare 0 risultati.
+function normalizzaRicerca(s) {
+  return (s || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function corrispondeRicerca(testoRicercabile, query) {
+  const hay = normalizzaRicerca(testoRicercabile);
+  const parole = normalizzaRicerca(query).split(' ').filter(Boolean);
+  return parole.length > 0 && parole.every(p => hay.includes(p));
+}
+
+// R6 "wow, come le app di tutti i giorni": avatar colorato con iniziali per
+// ogni cliente, invece di un cerchietto grigio uguale per tutti — stesso
+// linguaggio visivo di WhatsApp/Rubrica, aiuta a riconoscere il cliente
+// al volo scorrendo la lista, senza dover leggere ogni riga per intero.
+function inizialiNome(nome) {
+  return (nome || '').trim().split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+}
+const AVATAR_COLORI = [
+  'bg-blue-100 text-blue-700', 'bg-emerald-100 text-emerald-700', 'bg-amber-100 text-amber-700',
+  'bg-rose-100 text-rose-700', 'bg-violet-100 text-violet-700', 'bg-cyan-100 text-cyan-700',
+  'bg-orange-100 text-orange-700', 'bg-indigo-100 text-indigo-700',
+];
+function coloreAvatar(nome) {
+  const s = nome || '';
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) hash = (hash * 31 + s.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORI[hash % AVATAR_COLORI.length];
+}
+
+// R6 "stile carrello della spesa" (Amazon/Glovo, scelto da Denis/Deborah tra
+// 3 esempi): ogni prodotto ha un'iconetta colorata per categoria invece di
+// un pallino grigio uguale per tutti — aiuta a distinguere al volo cavi da
+// tubi da lampadine scorrendo i risultati di ricerca.
+function iconaCategoria(categoria) {
+  if (categoria === 'Elettrico') return Zap;
+  if (categoria === 'Idraulica') return Droplet;
+  if (categoria === 'Illuminazione') return Lightbulb;
+  if (categoria === 'Bagno') return Bath;
+  if (categoria === 'Riscaldamento e clima') return Flame;
+  return Package;
+}
+function coloreCategoria(categoria) {
+  if (categoria === 'Elettrico') return 'bg-amber-50 text-amber-600';
+  if (categoria === 'Idraulica') return 'bg-blue-50 text-blue-600';
+  if (categoria === 'Illuminazione') return 'bg-yellow-50 text-yellow-600';
+  if (categoria === 'Bagno') return 'bg-cyan-50 text-cyan-600';
+  if (categoria === 'Riscaldamento e clima') return 'bg-orange-50 text-orange-600';
+  return 'bg-slate-100 text-slate-500';
 }
 
 // ridimensiona e comprime una foto lato browser prima di caricarla, così
@@ -674,6 +713,11 @@ const LayoutDashboard = makeIcon('LayoutDashboard', [
   ['rect', { x: 3, y: 16, width: 7, height: 5, rx: 1 }]
 ]);
 
+const Copy = makeIcon('Copy', [
+  ['rect', { x: 9, y: 9, width: 13, height: 13, rx: 2 }],
+  ['path', { d: 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1' }]
+]);
+
 const FileText = makeIcon('FileText', [
   ['path', { d: 'M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z' }],
   ['path', { d: 'M14 2v5h5' }],
@@ -885,6 +929,16 @@ const Flame = makeIcon('Flame', [
 
 const Zap = makeIcon('Zap', [
   ['path', { d: 'M13 2 3 14h8l-1 8 10-12h-8l1-8z' }]
+]);
+
+const Droplet = makeIcon('Droplet', [
+  ['path', { d: 'M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z' }]
+]);
+
+const Lightbulb = makeIcon('Lightbulb', [
+  ['path', { d: 'M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5' }],
+  ['path', { d: 'M9 18h6' }],
+  ['path', { d: 'M10 22h4' }],
 ]);
 
 const Settings = makeIcon('Settings', [
@@ -1435,16 +1489,6 @@ async function generaPDFInterno({ cliente, carrello, subMat, subProd, subLavoro,
 }
 
 
-const materialiIniziali = [
-  { id: 'm1', nome: 'Tubo Multistrato PE-X 20mm', unita: 'm', prezzo: 2.40, ultimoAggiornamento: '10 giu 2026' },
-  { id: 'm2', nome: 'Raccordo a pressare dritto 1/2"', unita: 'pz', prezzo: 3.80, ultimoAggiornamento: '10 giu 2026' },
-  { id: 'm3', nome: 'Filtro defangatore magnetico RBM', unita: 'pz', prezzo: 64.00, ultimoAggiornamento: '08 giu 2026' },
-  { id: 'm4', nome: 'Cavo elettrico FG16OR16 3x2.5', unita: 'm', prezzo: 1.90, ultimoAggiornamento: '08 giu 2026' },
-  { id: 'm5', nome: 'Scatola di derivazione 503 Vimar', unita: 'pz', prezzo: 4.50, ultimoAggiornamento: '02 giu 2026' },
-  { id: 'm6', nome: 'Collettore di distribuzione riscaldamento', unita: 'pz', prezzo: 118.00, ultimoAggiornamento: '29 mag 2026' },
-  { id: 'm7', nome: 'Isolante termico per tubazioni', unita: 'm', prezzo: 1.60, ultimoAggiornamento: '29 mag 2026' },
-];
-
 const tierStyle = {
   'Standard': 'bg-slate-100 text-slate-600',
   'Premium': 'bg-blue-50 text-blue-600',
@@ -1541,40 +1585,40 @@ const TEMPLATE_LAVORI = [
   {
     id: 't1', nome: 'Sostituzione Caldaia', zona: 'centrale',
     materiali: [
-      { nome: 'Tubo Multistrato PE-X 20mm', unita: 'm', prezzo: 2.40, qty: 6 },
-      { nome: 'Raccordo a pressare dritto 1/2"', unita: 'pz', prezzo: 3.80, qty: 4 },
-      { nome: 'Collettore di distribuzione riscaldamento', unita: 'pz', prezzo: 118.00, qty: 1 },
+      { nome: 'Tubo Multistrato PE-X 20mm', categoria: 'Idraulica', unita: 'm', prezzo: 2.40, qty: 6 },
+      { nome: 'Raccordo a pressare dritto 1/2"', categoria: 'Idraulica', unita: 'pz', prezzo: 3.80, qty: 4 },
+      { nome: 'Collettore di distribuzione riscaldamento', categoria: 'Idraulica', unita: 'pz', prezzo: 118.00, qty: 1 },
     ],
     prodottoSuggerito: 'Caldaia a Condensazione Beretta 24kW',
   },
   {
     id: 't2', nome: 'Rifacimento Bagno Completo', zona: 'bagno',
     materiali: [
-      { nome: 'Tubo Multistrato PE-X 20mm', unita: 'm', prezzo: 2.40, qty: 12 },
-      { nome: 'Raccordo a pressare dritto 1/2"', unita: 'pz', prezzo: 3.80, qty: 8 },
-      { nome: 'Isolante termico per tubazioni', unita: 'm', prezzo: 1.60, qty: 10 },
+      { nome: 'Tubo Multistrato PE-X 20mm', categoria: 'Idraulica', unita: 'm', prezzo: 2.40, qty: 12 },
+      { nome: 'Raccordo a pressare dritto 1/2"', categoria: 'Idraulica', unita: 'pz', prezzo: 3.80, qty: 8 },
+      { nome: 'Isolante termico per tubazioni', categoria: 'Idraulica', unita: 'm', prezzo: 1.60, qty: 10 },
     ],
     prodottoSuggerito: 'Vaso WC Sospeso Geberit',
   },
   {
     id: 't3', nome: 'Impianto Elettrico Nuovo', zona: 'generico',
     materiali: [
-      { nome: 'Cavo elettrico FG16OR16 3x2.5', unita: 'm', prezzo: 1.90, qty: 30 },
-      { nome: 'Scatola di derivazione 503 Vimar', unita: 'pz', prezzo: 4.50, qty: 6 },
+      { nome: 'Cavo elettrico FG16OR16 3x2.5', categoria: 'Elettrico', unita: 'm', prezzo: 1.90, qty: 30 },
+      { nome: 'Scatola di derivazione 503 Vimar', categoria: 'Elettrico', unita: 'pz', prezzo: 4.50, qty: 6 },
     ],
     prodottoSuggerito: 'Placca Bticino Livinglight Bianca',
   },
   {
     id: 't4', nome: 'Sostituzione Sanitari', zona: 'bagno',
     materiali: [
-      { nome: 'Raccordo a pressare dritto 1/2"', unita: 'pz', prezzo: 3.80, qty: 3 },
+      { nome: 'Raccordo a pressare dritto 1/2"', categoria: 'Idraulica', unita: 'pz', prezzo: 3.80, qty: 3 },
     ],
     prodottoSuggerito: 'Vaso WC Sospeso Geberit',
   },
   {
     id: 't5', nome: 'Box Doccia Nuovo', zona: 'bagno',
     materiali: [
-      { nome: 'Raccordo a pressare dritto 1/2"', unita: 'pz', prezzo: 3.80, qty: 2 },
+      { nome: 'Raccordo a pressare dritto 1/2"', categoria: 'Idraulica', unita: 'pz', prezzo: 3.80, qty: 2 },
     ],
     prodottoSuggerito: 'Box Doccia Cristallo Temperato 6mm',
   },
@@ -1868,7 +1912,6 @@ function Sidebar({ currentPage, setCurrentPage, onLogout, mobileOpen, onMobileCl
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'preventivi', label: 'Preventivi', icon: FileText },
     { id: 'clienti', label: 'Clienti', icon: Users },
-    { id: 'materiali', label: 'Materiali', icon: Package },
     { id: 'catalogo', label: 'Catalogo Prodotti', icon: ShoppingBag },
     { id: 'impostazioni', label: 'Impostazioni', icon: Settings },
   ];
@@ -2057,8 +2100,8 @@ function PreventivoMobileList({ items, onSelect, messaggioVuoto }) {
             onClick={() => onSelect && onSelect(p)}
             className="app-ripple w-full px-4 py-3.5 flex items-center gap-3 text-left active:bg-slate-50 transition-colors"
           >
-            <div className="w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
-              <FileText className="w-5 h-5 text-slate-500" />
+            <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-semibold text-xs shrink-0 ${coloreAvatar(p.cliente)}`}>
+              {inizialiNome(p.cliente)}
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
@@ -2419,8 +2462,6 @@ function ClientiPage({ clienti, setClienti, clientiLoading, preventivi, onNuovoP
     .filter(c => c.nome.toLowerCase().includes(search.toLowerCase()) || c.indirizzo.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => a.nome.localeCompare(b.nome));
 
-  const initials = (nome) => nome.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
-
   const addCliente = async () => {
     if (!newNome.trim()) return;
     setSalvandoCliente(true);
@@ -2526,7 +2567,7 @@ function ClientiPage({ clienti, setClienti, clientiLoading, preventivi, onNuovoP
           <div className="flex items-start justify-between flex-wrap gap-4">
             <div className="flex items-start gap-3 min-w-0 w-full sm:w-auto">
               <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-slate-900 flex items-center justify-center text-white font-bold text-base sm:text-lg shrink-0">
-                {initials(selected.nome)}
+                {inizialiNome(selected.nome)}
               </div>
               <div className="min-w-0 flex-1">
                 <h2 className="text-lg font-semibold text-slate-900 tracking-tight truncate">{selected.nome}</h2>
@@ -2912,8 +2953,8 @@ function ClientiPage({ clienti, setClienti, clientiLoading, preventivi, onNuovoP
                 onClick={() => setSelectedId(c.id)}
                 className="app-ripple w-full flex items-center gap-3.5 px-5 py-3.5 text-left hover:bg-slate-50/60 transition-colors"
               >
-                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center font-semibold text-slate-600 text-xs shrink-0">
-                  {initials(c.nome)}
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-semibold text-xs shrink-0 ${coloreAvatar(c.nome)}`}>
+                  {inizialiNome(c.nome)}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-slate-900 truncate">{c.nome}</p>
@@ -3503,7 +3544,7 @@ function cancellaBozzaCliente(clienteId) {
 /* ============================================================ */
 /* PREVENTIVI PAGE                                               */
 /* ============================================================ */
-function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPreventivi, preventiviLoading, materiali, setMateriali, prodotti, vociLavoro, setVociLavoro, prezzoKm, presetClienteId, onConsumePreset, presetDettaglioId, onConsumePresetDettaglio }) {
+function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPreventivi, preventiviLoading, prodotti, setProdotti, vociLavoro, setVociLavoro, prezzoKm, presetClienteId, onConsumePreset, presetDettaglioId, onConsumePresetDettaglio }) {
   const [mode, setMode] = useState('lista'); // 'lista' | 'nuovo' | 'dettaglio'
   const [clienteId, setClienteId] = useState(null);
   const [statoEditId, setStatoEditId] = useState(null); // id preventivo in cambio stato
@@ -3517,13 +3558,12 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
   // helper per aggiornare clienti dal form inline
   const setClientiEsterni = setClienti;
   const [carrello, setCarrello] = useState([]); // { id, nome, meta, prezzoUnitario, qty, kind }
-  const [showNuovoMateriale, setShowNuovoMateriale] = useState(false);
-  const [nmNome, setNmNome] = useState('');
-  const [nmUnita, setNmUnita] = useState('m');
-  const [nmPrezzo, setNmPrezzo] = useState('');
-  const [nmZona, setNmZona] = useState('');
-  const [nmSalvando, setNmSalvando] = useState(false);
-  const [nmErrore, setNmErrore] = useState('');
+  // R6 "ultra rapido": duplica un preventivo già fatto come punto di
+  // partenza per uno nuovo — esattamente come faceva Denis prima con l'app,
+  // riprendendo un vecchio documento Word simile invece di scrivere da zero.
+  // Tenuto in sospeso qui finché non si sceglie il cliente per il nuovo
+  // preventivo, poi applicato in selezionaCliente/resetBozzaVuota.
+  const [duplicaPendente, setDuplicaPendente] = useState(null);
   const [showNuovoLavoro, setShowNuovoLavoro] = useState(false);
   const [lavoroDescrizione, setLavoroDescrizione] = useState('');
   const [lavoroPrezzo, setLavoroPrezzo] = useState('');
@@ -3540,8 +3580,6 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
   const [activeCat, setActiveCat] = useState(categorieCatalogo[0]);
   const [activeSubCatalogo, setActiveSubCatalogo] = useState('Tutte');
   const [queryCatalogoPreventivo, setQueryCatalogoPreventivo] = useState('');
-  const [queryMateriali, setQueryMateriali] = useState(''); // R4 #5: mancava del tutto una ricerca qui
-  const [materialiEspansi, setMaterialiEspansi] = useState(false); // R4: elenco completo a richiesta, per non scrollare troppo
   const [savedFlashId, setSavedFlashId] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
   const [riordinaAperto, setRiordinaAperto] = useState(null); // null | 'materiale' | 'lavori' | 'riepilogo'
@@ -3687,6 +3725,21 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
     });
   }, [kmTrasferta, prezzoKm]);
 
+  // R6 "ultra rapido/wow": i prodotti più usati nei preventivi reali già
+  // fatti — un tocco solo, senza cercare, per quelli che tornano sempre
+  // (placche, prese, tubi...). Calcolato dai preventivi veri, non a caso.
+  const prodottiPiuUsati = (() => {
+    const conteggio = {};
+    preventivi.forEach(p => (p.carrelloSnapshot || []).forEach(i => {
+      if (i.kind === 'prodotto') conteggio[i.id] = (conteggio[i.id] || 0) + 1;
+    }));
+    return Object.entries(conteggio)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([id]) => prodotti.find(p => p.id === id))
+      .filter(Boolean);
+  })();
+
   // catalogo prodotti nel costruttore preventivo — stessa navigazione a
   // cartelle + ricerca del Catalogo vero e proprio, ma con "+ Aggiungi" invece
   // di modifica inline, e filtrato per la zona attiva
@@ -3694,15 +3747,10 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
   const sottocategorieCatalogoPreventivo = ['Tutte', ...new Set(prodottiZonaCategoria.map(p => p.sottocategoria).filter(Boolean))];
   const ricercaCatalogoAttiva = queryCatalogoPreventivo.trim().length > 0;
   const risultatiRicercaCatalogoPreventivo = ricercaCatalogoAttiva
-    ? (() => {
-        const q = queryCatalogoPreventivo.trim().toLowerCase();
-        return prodotti.filter(p => visibileInZona(p, zonaAttiva) && (
-          (p.nome || '').toLowerCase().includes(q) ||
-          (p.codice || '').toLowerCase().includes(q) ||
-          (p.descrizione || '').toLowerCase().includes(q) ||
-          (p.sottocategoria || '').toLowerCase().includes(q)
-        ));
-      })()
+    ? prodotti.filter(p => visibileInZona(p, zonaAttiva) && corrispondeRicerca(
+        [p.nome, p.codice, p.descrizione, p.sottocategoria, p.categoria, p.fornitore].join(' '),
+        queryCatalogoPreventivo
+      ))
     : [];
   const mostraCartelleCatalogoPreventivo = !ricercaCatalogoAttiva && activeSubCatalogo === 'Tutte' && sottocategorieCatalogoPreventivo.length > 1;
   const conteggioSottocategorieCatalogoPreventivo = sottocategorieCatalogoPreventivo
@@ -3713,24 +3761,6 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
     : prodottiZonaCategoria.filter(p => activeSubCatalogo === 'Tutte' || p.sottocategoria === activeSubCatalogo);
   const prodottiCatalogoTecnici = prodottiCatalogoPreventivo.filter(p => p.categoria !== 'Bagno');
   const prodottiCatalogoBagno = prodottiCatalogoPreventivo.filter(p => p.categoria === 'Bagno');
-
-  // R4 #3: Denis vuole un'unica ricerca per materiali grezzi e prodotti —
-  // quando cerca nel catalogo, i materiali che matchano compaiono insieme
-  // ai prodotti, stesso posto, stesso comportamento
-  const materialiCatalogoPreventivo = ricercaCatalogoAttiva
-    ? materiali.filter(m => visibileInZona(m, zonaAttiva) && m.nome.toLowerCase().includes(queryCatalogoPreventivo.trim().toLowerCase()))
-    : [];
-
-  // R4 #5: ricerca per la lista "Materiali grezzi" — prima non esisteva
-  // R4 (feedback su "troppo scroll"): senza una ricerca attiva, mostra solo
-  // i materiali già nel carrello + quelli già aggiunti — l'elenco completo
-  // (che può essere lunghissimo) si apre solo su richiesta con "Mostra tutti"
-  const materialiFiltratiBuilderTutti = materiali
-    .filter(m => visibileInZona(m, zonaAttiva))
-    .filter(m => m.nome.toLowerCase().includes(queryMateriali.trim().toLowerCase()));
-  const materialiFiltratiBuilder = (queryMateriali.trim() || materialiEspansi)
-    ? materialiFiltratiBuilderTutti
-    : materialiFiltratiBuilderTutti.filter(m => carrello.find(i => i.id === m.id));
 
   // R4: ci possono essere più bozze in corso (una per cliente) — qui non
   // sappiamo ancora quale cliente sceglierà, quindi si riparte dalla
@@ -3743,12 +3773,46 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
   // sceglie un cliente esistente dalla lista di ricerca — se aveva già una
   // bozza in corso la ripristina, invece di ripartire da zero
   const selezionaCliente = (c) => {
+    if (duplicaPendente) {
+      setClienteId(c.id);
+      setCarrello(duplicaPendente.carrello);
+      setDiciture(duplicaPendente.diciture);
+      setZonaAttiva(duplicaPendente.zonaAttiva);
+      setRincaroMode(duplicaPendente.rincaroMode);
+      setRincaroPercent(duplicaPendente.rincaroPercent);
+      setRincaroOre(duplicaPendente.rincaroOre);
+      setRincaroTariffa(duplicaPendente.rincaroTariffa);
+      setDuplicaPendente(null);
+      return;
+    }
     const bozza = leggiBozzaCliente(c.id);
     if (bozza) {
       ripristinaBozza(bozza);
       return;
     }
     setClienteId(c.id);
+  };
+
+  // avvia una nuova bozza vuota ma con dentro le voci di un preventivo già
+  // fatto, come punto di partenza — chiede solo il cliente, poi tutto il
+  // resto (materiale, lavori, rincaro) è già pronto da aggiustare
+  const duplicaPreventivo = (p) => {
+    setDuplicaPendente({
+      carrello: (p.carrelloSnapshot || []).map(item => ({ ...item })),
+      diciture: JSON.parse(JSON.stringify(p.diciture || {})),
+      zonaAttiva: (p.zone && p.zone[0]) || 'generico',
+      rincaroMode: 'percent',
+      rincaroPercent: '10',
+      rincaroOre: '8',
+      rincaroTariffa: '35',
+    });
+    setModificaId(null);
+    setModificaDbId(null);
+    setClienteId(null);
+    setFotoCantiere([]);
+    setKmTrasferta('');
+    setClienteSearch('');
+    setMode('nuovo');
   };
 
   const resetBozzaVuota = () => {
@@ -3765,7 +3829,6 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
     setFotoCantiere([]);
     setClienteSearch('');
     setDiciture({});
-    setMaterialiEspansi(false);
     setMode('nuovo');
   };
 
@@ -3802,107 +3865,6 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
       const { data, error } = await sb.from('foto').select('*').eq('preventivo_id', p.dbId).order('creato_il', { ascending: true });
       if (!error && data) setFotoCantiere(data.map(fotoFromRow));
     }
-  };
-
-  const aggiornaPrezzoMateriale = async (matId, valoreStr) => {
-    const valore = parseFloat(valoreStr.replace(',', '.'));
-    if (!isNaN(valore) && valore > 0) {
-      const { error } = await sb.from('materiali')
-        .update({ prezzo: valore, ultimo_aggiornamento: new Date().toISOString() })
-        .eq('id', matId);
-      if (error) {
-        mostraToast('Errore nel salvare il prezzo: ' + error.message);
-        return;
-      }
-    }
-    setMateriali(materiali.map(m => m.id === matId ? { ...m, prezzo: isNaN(valore) ? m.prezzo : valore } : m));
-    if (!isNaN(valore) && valore > 0) {
-      const mat = materiali.find(m => m.id === matId);
-      setCarrello(prev => {
-        const exists = prev.find(i => i.id === matId);
-        const qty = exists ? exists.qty : 1;
-        const nuovaVoce = { id: matId, nome: mat.nome, meta: `${qty} ${mat.unita} × ${valore.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €`, prezzoUnitario: valore, qty, kind: 'materiale', zona: exists?.zona || zonaAttiva, unita: mat.unita };
-        if (exists) return prev.map(i => i.id === matId ? nuovaVoce : i);
-        return [...prev, nuovaVoce];
-      });
-      setSavedFlashId(matId);
-      setTimeout(() => setSavedFlashId(null), 1500);
-    } else if (valoreStr === '') {
-      setCarrello(prev => prev.filter(i => i.id !== matId));
-    }
-  };
-
-  const aggiornaQtyMateriale = (matId, qty) => {
-    const mat = materiali.find(m => m.id === matId);
-    if (!mat) return;
-    setCarrello(prev => {
-      const exists = prev.find(i => i.id === matId);
-      const prezzoUnitario = exists ? exists.prezzoUnitario : mat.prezzo;
-      const meta = `${qty} ${mat.unita} × ${prezzoUnitario.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €`;
-      if (exists) {
-        return prev.map(i => i.id === matId ? { ...i, qty, meta } : i);
-      }
-      if (qty <= 0) return prev;
-      return [...prev, { id: mat.id, nome: mat.nome, meta, prezzoUnitario, qty, kind: 'materiale', zona: zonaAttiva, unita: mat.unita }];
-    });
-  };
-
-  // aggiunge un materiale mai visto prima: lo crea nel listino Supabase e
-  // lo mette subito nel carrello di questo preventivo
-  const aggiungiMaterialeAlVolo = async () => {
-    const nomeDigitato = nmNome.trim();
-    if (!nomeDigitato) return;
-    // R4 #4: il controllo duplicati (già fatto per i materiali, R3 #4) ora
-    // copre anche i prodotti del catalogo — dopo l'unificazione (R4 #3) non
-    // deve più essere possibile ricreare come "materiale" qualcosa che
-    // esiste già come prodotto, e viceversa
-    const giaEsistenteProdotto = prodotti.find(p => p.nome.trim().toLowerCase() === nomeDigitato.toLowerCase());
-    if (giaEsistenteProdotto) {
-      const inCarrelloProdotto = carrello.find(i => i.id === giaEsistenteProdotto.id);
-      if (!inCarrelloProdotto) toggleProdotto(giaEsistenteProdotto);
-      mostraToast(`"${giaEsistenteProdotto.nome}" era già nel catalogo prodotti — aggiunto da lì.`, 'info');
-      setNmNome(''); setNmUnita('m'); setNmPrezzo(''); setNmZona(''); setShowNuovoMateriale(false);
-      return;
-    }
-    const giaEsistente = materiali.find(m => m.nome.trim().toLowerCase() === nomeDigitato.toLowerCase());
-    if (giaEsistente) {
-      setCarrello(prev => {
-        const inCarrello = prev.find(i => i.id === giaEsistente.id);
-        const qty = inCarrello ? inCarrello.qty + 1 : 1;
-        const nuovaVoce = {
-          id: giaEsistente.id, nome: giaEsistente.nome,
-          meta: `${qty} ${giaEsistente.unita} × ${giaEsistente.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €`,
-          prezzoUnitario: giaEsistente.prezzo, qty, kind: 'materiale', zona: zonaAttiva, unita: giaEsistente.unita,
-        };
-        return inCarrello ? prev.map(i => i.id === giaEsistente.id ? nuovaVoce : i) : [...prev, nuovaVoce];
-      });
-      mostraToast(`"${giaEsistente.nome}" era già nel listino — aggiunto da lì.`, 'info');
-      setNmNome(''); setNmUnita('m'); setNmPrezzo(''); setNmZona(''); setShowNuovoMateriale(false);
-      return;
-    }
-    setNmSalvando(true);
-    setNmErrore('');
-    const prezzo = parseFloat((nmPrezzo || '0').replace(',', '.')) || 0;
-    const { data, error } = await sb.from('materiali')
-      .insert(materialeToRow({ nome: nomeDigitato, unita: nmUnita, prezzo, zona: nmZona }))
-      .select().single();
-    setNmSalvando(false);
-    if (error) {
-      setNmErrore('Errore nel salvare il materiale: ' + error.message);
-      return;
-    }
-    const nuovoMat = materialeFromRow(data);
-    setMateriali(prev => [...prev, nuovoMat]);
-    setCarrello(prev => [...prev, {
-      id: nuovoMat.id, nome: nuovoMat.nome,
-      meta: `1 ${nuovoMat.unita} × ${nuovoMat.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €`,
-      prezzoUnitario: nuovoMat.prezzo, qty: 1, kind: 'materiale', zona: zonaAttiva, unita: nuovoMat.unita,
-    }]);
-    setNmNome('');
-    setNmUnita('m');
-    setNmPrezzo('');
-    setNmZona('');
-    setShowNuovoMateriale(false);
   };
 
   // R2 #7: voce di lavoro/manodopera libera con categoria — se non esiste già
@@ -3961,14 +3923,18 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
     } : i));
   };
 
+  const metaProdotto = (p, qty) => p.unita === 'm'
+    ? `${qty} m × ${p.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €`
+    : p.tier;
+
   const toggleProdotto = (p) => {
     const exists = carrello.find(i => i.id === p.id);
     if (exists) {
       setCarrello(carrello.filter(i => i.id !== p.id));
     } else {
       setCarrello([...carrello, {
-        id: p.id, nome: p.nome, meta: p.tier, prezzoUnitario: p.prezzo, qty: 1, kind: 'prodotto',
-        zona: zonaAttiva, tipoInstallazione: 'nuova',
+        id: p.id, nome: p.nome, meta: metaProdotto(p, 1), prezzoUnitario: p.prezzo, qty: 1, kind: 'prodotto',
+        unita: p.unita, zona: zonaAttiva, tipoInstallazione: 'nuova',
         // portati nel carrello per generare una dicitura ricca nel documento (FASE 4)
         fornitore: p.fornitore, misuraLunghezza: p.misuraLunghezza, misuraProfondita: p.misuraProfondita,
         misuraAltezza: p.misuraAltezza, descrizioneProdotto: p.descrizione,
@@ -3977,10 +3943,15 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
   };
 
   // P3: quantità multiple per i prodotti già nel carrello
+  // R5 (segnalato da Deborah/Denis): per i prodotti venduti al metro (cavi,
+  // tubi...) cliccare + una cifra alla volta era impraticabile — stessa
+  // soluzione già usata per i vecchi "materiali grezzi": si scrive il numero
+  // direttamente. Ora vale per qualunque prodotto, non solo quelli al metro,
+  // utile anche per grandi quantità a pezzo (es. 31 placche, 54 moduli ciechi).
   const aggiornaQtyProdotto = (id, qty) => {
     setCarrello(prev => {
       if (qty <= 0) return prev.filter(i => i.id !== id);
-      return prev.map(i => i.id === id ? { ...i, qty } : i);
+      return prev.map(i => i.id === id ? { ...i, qty, meta: i.unita === 'm' ? `${qty} m × ${i.prezzoUnitario.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €` : i.meta } : i);
     });
   };
 
@@ -3995,35 +3966,36 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
   const applicaTemplate = async (template) => {
     setZonaAttiva(template.zona);
     for (const tm of template.materiali) {
-      const matEsistente = materiali.find(m => m.nome === tm.nome);
-      let matId = matEsistente?.id;
-      if (!matEsistente) {
-        const { data, error } = await sb.from('materiali')
-          .insert(materialeToRow({ nome: tm.nome, unita: tm.unita, prezzo: tm.prezzo }))
+      const prodEsistente = prodotti.find(p => p.nome === tm.nome);
+      let prodId = prodEsistente?.id;
+      let unitaUsata = prodEsistente?.unita || tm.unita;
+      if (!prodEsistente) {
+        const { data, error } = await sb.from('prodotti')
+          .insert(prodottoToRow({ nome: tm.nome, categoria: tm.categoria, sottocategoria: 'Generico', tier: 'Standard', fornitore: 'Tecnomat', unita: tm.unita, prezzo: tm.prezzo }))
           .select().single();
         if (error) {
-          console.error('Errore nel salvare il materiale dal template:', error);
+          console.error('Errore nel salvare il prodotto dal template:', error);
           continue;
         }
-        const nuovoMat = materialeFromRow(data);
-        setMateriali(prevMat => [...prevMat, nuovoMat]);
-        matId = nuovoMat.id;
+        const nuovoProd = prodottoFromRow(data);
+        setProdotti(prevProd => [...prevProd, nuovoProd]);
+        prodId = nuovoProd.id;
       }
       setCarrello(prev => {
-        const exists = prev.find(i => i.id === matId);
+        const exists = prev.find(i => i.id === prodId);
         if (exists) {
           // già in carrello (da un altro template o aggiunto a mano): sommiamo
           // la quantità del template invece di ignorarla, altrimenti il
-          // materiale resta con una quantità insufficiente per il lavoro
+          // prodotto resta con una quantità insufficiente per il lavoro
           const nuovaQty = exists.qty + tm.qty;
-          return prev.map(i => i.id === matId
-            ? { ...i, qty: nuovaQty, meta: `${nuovaQty} ${tm.unita} × ${i.prezzoUnitario.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €` }
+          return prev.map(i => i.id === prodId
+            ? { ...i, qty: nuovaQty, meta: unitaUsata === 'm' ? `${nuovaQty} m × ${i.prezzoUnitario.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €` : i.meta }
             : i);
         }
         return [...prev, {
-          id: matId, nome: tm.nome,
-          meta: `${tm.qty} ${tm.unita} × ${tm.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €`,
-          prezzoUnitario: tm.prezzo, qty: tm.qty, kind: 'materiale', zona: template.zona,
+          id: prodId, nome: tm.nome,
+          meta: unitaUsata === 'm' ? `${tm.qty} m × ${tm.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €` : 'Standard',
+          prezzoUnitario: tm.prezzo, qty: tm.qty, kind: 'prodotto', zona: template.zona, unita: unitaUsata,
         }];
       });
     }
@@ -4318,6 +4290,14 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
             Torna ai preventivi
           </button>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => duplicaPreventivo(p)}
+              className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900"
+              title="Usa questo preventivo come punto di partenza per uno nuovo"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              Duplica
+            </button>
             <button
               onClick={() => iniziaModifica(p)}
               className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-800"
@@ -4663,6 +4643,7 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
               frattempo ne è arrivato uno nuovo, non serve finire quello
               vecchio prima di poterlo iniziare */}
           {(() => {
+            if (duplicaPendente) return null;
             const bozzePendenti = Object.entries(leggiTutteLeBozze())
               .map(([id, b]) => ({ id, bozza: b, cliente: clienti.find(c => c.id === id) }))
               .filter(x => x.cliente);
@@ -4689,10 +4670,21 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
             );
           })()}
 
+          {duplicaPendente && (
+            <div className="app-card p-4 bg-blue-50 border border-blue-100 flex items-center justify-between gap-3">
+              <p className="text-xs text-blue-800">
+                <Copy className="w-3.5 h-3.5 inline -mt-0.5 mr-1" />
+                Stai duplicando un preventivo — scegli il cliente e troverai già tutto pronto.
+              </p>
+              <button onClick={() => setDuplicaPendente(null)} className="text-blue-400 hover:text-blue-600 shrink-0">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           {/* Selezione cliente esistente */}
           <div className="app-card p-6">
-            <p className="text-sm font-semibold text-slate-900 mb-1">Seleziona il cliente</p>
-            <p className="text-xs text-slate-400 mb-4">Per quale cliente stai preparando questo preventivo?</p>
+            <p className="text-sm font-semibold text-slate-900 mb-3">Seleziona il cliente</p>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
@@ -4712,10 +4704,15 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
                     key={c.id}
                     type="button"
                     onClick={() => selezionaCliente(c)}
-                    className="w-full text-left px-3.5 py-2.5 hover:bg-slate-50 transition-colors"
+                    className="app-ripple w-full flex items-center gap-3 text-left px-3.5 py-2.5 hover:bg-slate-50 transition-colors"
                   >
-                    <p className="text-sm font-medium text-slate-900 truncate">{c.nome}</p>
-                    <p className="text-xs text-slate-400 truncate mt-0.5">{c.indirizzo}</p>
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center font-semibold text-[11px] shrink-0 ${coloreAvatar(c.nome)}`}>
+                      {inizialiNome(c.nome)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-slate-900 truncate">{c.nome}</p>
+                      <p className="text-xs text-slate-400 truncate mt-0.5">{c.indirizzo}</p>
+                    </div>
                   </button>
                 ))}
               {clienti.filter(c => c.nome.toLowerCase().includes(clienteSearch.toLowerCase()) || c.indirizzo.toLowerCase().includes(clienteSearch.toLowerCase())).length === 0 && (
@@ -4758,7 +4755,6 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
             <div className="app-card overflow-hidden">
               <div className="px-4 sm:px-5 py-3.5 border-b border-slate-100">
                 <p className="text-sm font-semibold text-slate-900">Zona di lavoro</p>
-                <p className="text-xs text-slate-400 mt-0.5">Seleziona l&apos;ambiente in cui stai lavorando</p>
               </div>
               <div className="p-3 sm:p-4">
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5">
@@ -4854,169 +4850,12 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
               </div>
             </div>
 
-            {/* materiali */}
-            <div className="app-card overflow-hidden">
-              <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-                <p className="text-sm font-semibold text-slate-900">Materiali grezzi</p>
-                <button
-                  type="button"
-                  onClick={() => setShowNuovoMateriale(!showNuovoMateriale)}
-                  className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Nuovo materiale
-                </button>
-              </div>
-              <div className="px-5 py-3 border-b border-slate-100">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    type="text"
-                    value={queryMateriali}
-                    onChange={(e) => setQueryMateriali(e.target.value)}
-                    placeholder="Cerca un materiale..."
-                    className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-                  />
-                </div>
-              </div>
-              {showNuovoMateriale && (
-                <div className="px-5 py-4 bg-slate-50 border-b border-slate-100">
-                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_auto_auto] gap-2.5 items-end">
-                    <div>
-                      <label className="block text-[11px] font-medium text-slate-500 mb-1">Nome materiale</label>
-                      <input
-                        type="text"
-                        autoFocus
-                        value={nmNome}
-                        onChange={(e) => setNmNome(e.target.value)}
-                        placeholder="Es. Tubo in rame 14mm"
-                        className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-medium text-slate-500 mb-1">Unità</label>
-                      <select
-                        value={nmUnita}
-                        onChange={(e) => setNmUnita(e.target.value)}
-                        className="px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-                      >
-                        <option value="m">al metro (m)</option>
-                        <option value="pz">a pezzo (pz)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-medium text-slate-500 mb-1">Prezzo €</label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={nmPrezzo}
-                        onChange={(e) => setNmPrezzo(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && aggiungiMaterialeAlVolo()}
-                        placeholder="0,00"
-                        className="w-24 px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-medium text-slate-500 mb-1">Zona</label>
-                      <select
-                        value={nmZona}
-                        onChange={(e) => setNmZona(e.target.value)}
-                        className="px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-                      >
-                        <option value="">Tutte le zone</option>
-                        {ZONE_AMBIENTI.map(z => <option key={z.id} value={z.id}>{z.nome}</option>)}
-                      </select>
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={aggiungiMaterialeAlVolo}
-                        disabled={nmSalvando}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60"
-                      >
-                        {nmSalvando ? 'Salvo...' : 'Aggiungi'}
-                      </button>
-                      <button
-                        onClick={() => setShowNuovoMateriale(false)}
-                        className="px-3 py-2 text-slate-400 hover:text-slate-600"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                  {nmErrore && <p className="text-[11px] text-red-500 mt-2">{nmErrore}</p>}
-                </div>
-              )}
-              <div className="divide-y divide-slate-50">
-                {materialiFiltratiBuilder.length === 0 && (
-                  <p className="text-xs text-slate-400 text-center py-6">
-                    {queryMateriali
-                      ? 'Nessun materiale trovato.'
-                      : 'Nessun materiale ancora aggiunto — cerca sopra o apri l’elenco completo.'}
-                  </p>
-                )}
-                {materialiFiltratiBuilder.map(m => {
-                  const inCarrello = carrello.find(i => i.id === m.id);
-                  return (
-                    <div key={m.id} className="px-4 sm:px-5 py-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-slate-900">{m.nome}</p>
-                        <p className="text-xs text-slate-400">{m.unita === 'm' ? 'al metro' : 'a pezzo'}</p>
-                      </div>
-                      <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
-                        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-1.5 py-1">
-                          <button onClick={() => aggiornaQtyMateriale(m.id, Math.max(1, (inCarrello?.qty || 1) - 1))} className="text-slate-400 w-5 text-center font-bold">−</button>
-                          {/* R4 #11: per i cavi (prezzo al metro) cliccare + una
-                              cifra alla volta era impraticabile — ora si può
-                              scrivere direttamente quanti metri servono */}
-                          <input
-                            key={`qty-${m.id}-${inCarrello?.qty || 0}`}
-                            type="text"
-                            inputMode="decimal"
-                            defaultValue={inCarrello?.qty || ''}
-                            onChange={(e) => {
-                              const val = parseFloat((e.target.value || '0').replace(',', '.'));
-                              aggiornaQtyMateriale(m.id, isNaN(val) ? 0 : val);
-                            }}
-                            placeholder="0"
-                            className="w-9 text-center text-xs font-mono text-slate-700 bg-transparent outline-none"
-                          />
-                          <button onClick={() => aggiornaQtyMateriale(m.id, (inCarrello?.qty || 0) + 1)} className="text-slate-400 w-5 text-center font-bold">+</button>
-                        </div>
-                        <div className={`flex items-center gap-1 border rounded-lg px-2.5 py-1.5 transition-colors ${savedFlashId === m.id ? 'bg-emerald-50 border-emerald-300' : 'bg-slate-50 border-slate-200'}`}>
-                          <span className="text-slate-400 text-xs">€</span>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            defaultValue={m.prezzo ? m.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 }) : ''}
-                            onChange={(e) => aggiornaPrezzoMateriale(m.id, e.target.value)}
-                            className="w-16 bg-transparent text-right text-sm font-mono text-slate-900 outline-none"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {!queryMateriali.trim() && (
-                <button
-                  type="button"
-                  onClick={() => setMaterialiEspansi(!materialiEspansi)}
-                  className="w-full text-xs font-semibold text-blue-600 hover:text-blue-800 py-3 border-t border-slate-100"
-                >
-                  {materialiEspansi
-                    ? 'Mostra solo i materiali già aggiunti'
-                    : `Mostra l'elenco completo (${materialiFiltratiBuilderTutti.length})`}
-                </button>
-              )}
-            </div>
-
             {/* voci di lavoro/manodopera libere — non fanno parte del catalogo,
                 es. "smontaggio vecchi sanitari" richiesto da un cliente */}
             <div className="app-card overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-base font-bold text-slate-900">Voci di lavoro</p>
-                  <p className="text-xs text-slate-400 mt-0.5">Mini-catalogo riutilizzabile: cerca o scegli una categoria</p>
                 </div>
                 <button
                   type="button"
@@ -5053,9 +4892,9 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
                   ))}
                 </div>
                 {(() => {
-                  const q = queryLavoro.trim().toLowerCase();
+                  const q = queryLavoro.trim();
                   const risultati = q
-                    ? vociLavoro.filter(v => v.nome.toLowerCase().includes(q))
+                    ? vociLavoro.filter(v => corrispondeRicerca(v.nome, q))
                     : vociLavoro.filter(v => v.categoria === lavoroCategoria);
                   if (risultati.length === 0) {
                     return (
@@ -5274,7 +5113,7 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
                     type="text"
                     value={queryCatalogoPreventivo}
                     onChange={(e) => setQueryCatalogoPreventivo(e.target.value)}
-                    placeholder="Cerca prodotto o materiale per nome, codice..."
+                    placeholder="Cerca un prodotto per nome, codice..."
                     className="w-full pl-9 pr-9 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                   />
                   {ricercaCatalogoAttiva && (
@@ -5287,6 +5126,23 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
                     </button>
                   )}
                 </div>
+                {!ricercaCatalogoAttiva && prodottiPiuUsati.length > 0 && (
+                  <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+                    {prodottiPiuUsati.map(p => {
+                      const isAdded = !!carrello.find(i => i.id === p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => toggleProdotto(p)}
+                          className={`app-ripple shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${isAdded ? 'bg-emerald-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
+                        >
+                          {isAdded ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                          {p.nome.length > 22 ? p.nome.slice(0, 22) + '…' : p.nome}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
                 {!ricercaCatalogoAttiva && (
                   <div className="flex gap-1 overflow-x-auto">
                     {[...new Set([...categorieCatalogo, ...prodotti.map(p => p.categoria).filter(Boolean)])].map(cat => (
@@ -5339,33 +5195,8 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
                 <>
                   {ricercaCatalogoAttiva && (
                     <p className="text-xs font-semibold text-slate-500 px-5 pt-3">
-                      {prodottiCatalogoPreventivo.length + materialiCatalogoPreventivo.length} risultat{(prodottiCatalogoPreventivo.length + materialiCatalogoPreventivo.length) === 1 ? 'o' : 'i'} per "{queryCatalogoPreventivo.trim()}"
+                      {prodottiCatalogoPreventivo.length} risultat{prodottiCatalogoPreventivo.length === 1 ? 'o' : 'i'} per "{queryCatalogoPreventivo.trim()}"
                     </p>
-                  )}
-
-                  {/* R4 #3: materiali grezzi che matchano la ricerca, nello
-                      stesso posto e con lo stesso comportamento dei prodotti */}
-                  {materialiCatalogoPreventivo.length > 0 && (
-                    <div className="divide-y divide-slate-50">
-                      {materialiCatalogoPreventivo.map((m) => {
-                        const inCarrello = carrello.find(i => i.id === m.id);
-                        return (
-                          <div key={m.id} className="pl-3.5 pr-4 py-3 border-l-[3px] border-amber-400 flex items-center justify-between gap-3">
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[13px] font-semibold text-slate-900 truncate">{m.nome}</p>
-                              <p className="text-[11px] text-slate-400 truncate mt-0.5">{m.unita === 'm' ? 'al metro' : 'a pezzo'} · Materiale</p>
-                              <p className="text-sm font-semibold text-slate-900 mt-1">{fmtEuro(m.prezzo)}</p>
-                            </div>
-                            <button
-                              onClick={() => aggiornaQtyMateriale(m.id, (inCarrello?.qty || 0) + 1)}
-                              className={`shrink-0 text-[11px] font-bold px-3 py-2 rounded-lg transition-colors ${inCarrello ? 'bg-slate-900 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'}`}
-                            >
-                              {inCarrello ? `✓ ${inCarrello.qty}` : '+ Aggiungi'}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
                   )}
 
                   {prodottiCatalogoTecnici.length > 0 && (
@@ -5379,8 +5210,12 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
                           ricercaCatalogoAttiva ? p.sottocategoria : null,
                           p.fornitore, p.codice, misure,
                         ].filter(Boolean).join(' · ');
+                        const IconaProdotto = iconaCategoria(p.categoria);
                         return (
-                          <div key={p.id} className="pl-3.5 pr-4 py-3 border-l-[3px] border-blue-400 flex items-center justify-between gap-3">
+                          <div key={p.id} className="px-4 py-3 flex items-center gap-3">
+                            <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${coloreCategoria(p.categoria)}`}>
+                              <IconaProdotto className="w-5 h-5" />
+                            </div>
                             <div className="min-w-0 flex-1">
                               <p className="text-[13px] font-semibold text-slate-900 truncate">{p.nome}</p>
                               {sottotitolo && <p className="text-[11px] text-slate-400 truncate mt-0.5">{sottotitolo}</p>}
@@ -5388,9 +5223,9 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
                             </div>
                             <button
                               onClick={() => toggleProdotto(p)}
-                              className={`shrink-0 text-[11px] font-bold px-3 py-2 rounded-lg transition-colors ${isAdded ? 'bg-slate-900 text-white' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+                              className={`app-ripple shrink-0 text-[11px] font-bold px-4 py-2.5 rounded-full transition-colors ${isAdded ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
                             >
-                              {isAdded ? '✓' : '+ Aggiungi'}
+                              {isAdded ? '✓' : 'Aggiungi'}
                             </button>
                           </div>
                         );
@@ -5423,7 +5258,7 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
                     </div>
                   )}
 
-                  {prodottiCatalogoPreventivo.length === 0 && materialiCatalogoPreventivo.length === 0 && (
+                  {prodottiCatalogoPreventivo.length === 0 && (
                     <p className="text-xs text-slate-400 text-center py-6 px-5">
                       {ricercaCatalogoAttiva ? 'Nessun prodotto trovato.' : 'Nessun prodotto per questa zona in questa categoria.'}
                     </p>
@@ -5447,7 +5282,7 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
 
             <div className="space-y-2 max-h-[280px] overflow-y-auto mb-4">
               {carrello.length === 0 && (
-                <p className="text-xs text-slate-400 text-center py-6">Aggiungi materiali o prodotti per iniziare.</p>
+                <p className="text-xs text-slate-400 text-center py-6">Aggiungi prodotti per iniziare.</p>
               )}
               {carrello.map((item, index) => {
                 const zonaInfo = ZONE_AMBIENTI.find(z => z.id === (item.zona || 'generico'));
@@ -5463,10 +5298,20 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {item.kind === 'prodotto' && (
-                        <div className="flex items-center gap-0.5 bg-white border border-slate-200 rounded-md px-1 py-0.5">
-                          <button onClick={() => aggiornaQtyProdotto(item.id, item.qty - 1)} className="text-slate-400 w-4 text-center font-bold text-xs">−</button>
-                          <span className="w-5 text-center text-[11px] font-mono text-slate-700">{item.qty}</span>
-                          <button onClick={() => aggiornaQtyProdotto(item.id, item.qty + 1)} className="text-slate-400 w-4 text-center font-bold text-xs">+</button>
+                        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-full px-1 py-1">
+                          <button onClick={() => aggiornaQtyProdotto(item.id, item.qty - 1)} className="app-ripple w-5 h-5 rounded-full bg-slate-100 text-slate-500 text-center font-bold text-xs shrink-0">−</button>
+                          <input
+                            key={`qtyp-${item.id}-${item.qty}`}
+                            type="text"
+                            inputMode="decimal"
+                            defaultValue={item.qty}
+                            onChange={(e) => {
+                              const val = parseFloat((e.target.value || '0').replace(',', '.'));
+                              aggiornaQtyProdotto(item.id, isNaN(val) ? 0 : val);
+                            }}
+                            className="w-7 text-center text-[11px] font-mono text-slate-700 bg-transparent outline-none"
+                          />
+                          <button onClick={() => aggiornaQtyProdotto(item.id, item.qty + 1)} className="app-ripple w-5 h-5 rounded-full bg-slate-100 text-slate-500 text-center font-bold text-xs shrink-0">+</button>
                         </div>
                       )}
                       <span className="text-xs font-bold text-slate-900">{fmtEuro(Math.round(item.prezzoUnitario * item.qty))}</span>
@@ -5785,6 +5630,30 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
         />
       )}
 
+      {/* R6 "ultra rapido/wow": totale sempre visibile in fondo allo schermo
+          mentre si scorre — come il carrello di un'app seria (Amazon,
+          Glovo...), invece di dover scendere fino in fondo per vederlo.
+          Solo su telefono: su desktop il riepilogo è già sempre visibile
+          nella colonna laterale. */}
+      {cliente && !showPreview && !riordinaAperto && (
+        <div className="sticky bottom-0 z-30 -mx-4 sm:-mx-6 lg:hidden">
+          <div className="bg-white/95 backdrop-blur border-t border-slate-200 px-4 py-3 flex items-center justify-between gap-3 shadow-[0_-6px_16px_rgba(15,23,42,0.08)]">
+            <div>
+              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Totale</p>
+              <p className="text-lg font-bold text-slate-900">{fmtEuro(Math.round(totale))}</p>
+            </div>
+            <button
+              onClick={() => setShowPreview(true)}
+              disabled={carrello.length === 0 || (!modificaId && fotoCantiere.length < 2)}
+              className="app-ripple shrink-0 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-semibold px-5 py-2.5 rounded-full transition-colors flex items-center gap-2"
+            >
+              <FileText className="w-4 h-4" />
+              Anteprima
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* success modal */}
       {showSuccess && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
@@ -5814,378 +5683,6 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
 }
 
 
-
-/* ============================================================ */
-/* PAGINA MATERIALI — listino personale, cresce nel tempo         */
-/* ============================================================ */
-
-function MaterialiPage({ materiali, setMateriali, materialiLoading }) {
-  const [search, setSearch] = useState('');
-  const [editingId, setEditingId] = useState(null);
-  const [editValue, setEditValue] = useState('');
-  const [renamingId, setRenamingId] = useState(null);
-  const [renameValue, setRenameValue] = useState('');
-  const [showNewForm, setShowNewForm] = useState(false);
-  const [newNome, setNewNome] = useState('');
-  const [newUnita, setNewUnita] = useState('m');
-  const [newPrezzo, setNewPrezzo] = useState('');
-  const [savedFlashId, setSavedFlashId] = useState(null);
-  const [salvandoNuovo, setSalvandoNuovo] = useState(false);
-  const [erroreNuovo, setErroreNuovo] = useState('');
-
-  const oggi = () => {
-    const d = new Date();
-    return d.toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' });
-  };
-
-  const startEdit = (m) => {
-    setEditingId(m.id);
-    setEditValue(String(m.prezzo).replace('.', ','));
-  };
-
-  const confirmEdit = async (id) => {
-    const val = parseFloat(editValue.replace(',', '.'));
-    setEditingId(null);
-    if (isNaN(val) || val <= 0) return;
-    const { error } = await sb.from('materiali')
-      .update({ prezzo: val, ultimo_aggiornamento: new Date().toISOString() })
-      .eq('id', id);
-    if (error) {
-      mostraToast('Errore nel salvare il prezzo: ' + error.message);
-      return;
-    }
-    setMateriali(materiali.map(m => m.id === id ? { ...m, prezzo: val, ultimoAggiornamento: oggi() } : m));
-    setSavedFlashId(id);
-    setTimeout(() => setSavedFlashId(null), 1800);
-  };
-
-  const startRename = (m) => {
-    setRenamingId(m.id);
-    setRenameValue(m.nome);
-  };
-
-  const confirmRename = async (id) => {
-    const nome = renameValue.trim();
-    setRenamingId(null);
-    const originale = materiali.find(m => m.id === id)?.nome;
-    if (!nome || nome === originale) return;
-    const { error } = await sb.from('materiali').update({ nome }).eq('id', id);
-    if (error) {
-      mostraToast('Errore nel salvare il nome: ' + error.message);
-      return;
-    }
-    setMateriali(materiali.map(m => m.id === id ? { ...m, nome } : m));
-  };
-
-  const aggiornaZonaMateriale = async (id, zona) => {
-    const { error } = await sb.from('materiali').update({ zona: zona || null }).eq('id', id);
-    if (error) {
-      mostraToast('Errore nel salvare la zona: ' + error.message);
-      return;
-    }
-    setMateriali(materiali.map(m => m.id === id ? { ...m, zona } : m));
-  };
-
-  const deleteMateriale = async (id) => {
-    const { error } = await sb.from('materiali').delete().eq('id', id);
-    if (error) {
-      mostraToast('Errore nell’eliminare il materiale: ' + error.message);
-      return;
-    }
-    setMateriali(materiali.filter(m => m.id !== id));
-  };
-
-  const addMateriale = async () => {
-    if (!newNome.trim()) return;
-    setSalvandoNuovo(true);
-    setErroreNuovo('');
-    const prezzo = parseFloat((newPrezzo || '0').replace(',', '.')) || 0;
-    const { data, error } = await sb.from('materiali')
-      .insert(materialeToRow({ nome: newNome.trim(), unita: newUnita, prezzo }))
-      .select().single();
-    setSalvandoNuovo(false);
-    if (error) {
-      setErroreNuovo('Errore nel salvare il materiale: ' + error.message);
-      return;
-    }
-    setMateriali([materialeFromRow(data), ...materiali]);
-    setNewNome('');
-    setNewUnita('m');
-    setNewPrezzo('');
-    setShowNewForm(false);
-  };
-
-  // R4 #5: la lista materiali non aveva nessuna ricerca — con tanti materiali
-  // diventava impossibile trovare qualcosa al volo
-  const materialiFiltrati = materiali.filter(m => m.nome.toLowerCase().includes(search.trim().toLowerCase()));
-
-  return (
-    <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5 flex-1 flex flex-col min-h-0">
-
-      <div className="app-card overflow-hidden flex-1 flex flex-col">
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-900">Materiali grezzi</h2>
-            <p className="text-xs text-slate-400 mt-0.5">{materiali.length} voci nel listino</p>
-          </div>
-          <button
-            onClick={() => setShowNewForm(!showNewForm)}
-            className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition-colors shrink-0"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Nuovo materiale
-          </button>
-        </div>
-
-        <div className="px-5 py-3 border-b border-slate-100">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Cerca un materiale..."
-              className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-            />
-          </div>
-        </div>
-
-        {showNewForm && (
-          <div className="px-5 py-4 bg-slate-50 border-b border-slate-100">
-            <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto_auto] gap-2.5 items-end">
-              <div>
-                <label className="block text-[11px] font-medium text-slate-500 mb-1">Nome materiale</label>
-                <input
-                  type="text"
-                  value={newNome}
-                  onChange={(e) => setNewNome(e.target.value)}
-                  placeholder="Es. Tubo in rame 14mm"
-                  className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-medium text-slate-500 mb-1">Unità</label>
-                <select
-                  value={newUnita}
-                  onChange={(e) => setNewUnita(e.target.value)}
-                  className="px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-                >
-                  <option value="m">al metro (m)</option>
-                  <option value="pz">a pezzo (pz)</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[11px] font-medium text-slate-500 mb-1">Prezzo €</label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={newPrezzo}
-                  onChange={(e) => setNewPrezzo(e.target.value)}
-                  placeholder="0,00"
-                  className="w-24 px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-                />
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={addMateriale}
-                  disabled={salvandoNuovo}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60"
-                >
-                  {salvandoNuovo ? 'Salvo...' : 'Aggiungi'}
-                </button>
-                <button
-                  onClick={() => setShowNewForm(false)}
-                  className="px-3 py-2 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-            {erroreNuovo && <p className="text-[11px] text-red-500 mt-2">{erroreNuovo}</p>}
-          </div>
-        )}
-
-        {/* lista a card — su telefono una tabella non si sente mai come
-            un'app nativa, meglio righe verticali con tocchi larghi */}
-        <div className="lg:hidden divide-y divide-slate-50">
-          {materialiFiltrati.map((m) => (
-            <div key={m.id} className="px-4 py-3.5 flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                {renamingId === m.id ? (
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      autoFocus
-                      type="text"
-                      value={renameValue}
-                      onChange={(e) => setRenameValue(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && confirmRename(m.id)}
-                      onBlur={() => confirmRename(m.id)}
-                      className="w-full px-2 py-1.5 text-sm bg-white border border-blue-300 rounded-md outline-none focus:ring-2 focus:ring-blue-500/30"
-                    />
-                    <button onClick={() => confirmRename(m.id)} className="text-emerald-600 hover:text-emerald-700 shrink-0 p-1">
-                      <Check className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <button onClick={() => startRename(m)} className="text-left text-sm font-medium text-slate-900 truncate block w-full py-1 -my-1">
-                    {m.nome}
-                  </button>
-                )}
-                <p className="text-xs text-slate-400 font-mono mt-1">
-                  {m.unita}{m.ultimoAggiornamento ? ` · ${m.ultimoAggiornamento}` : ''}
-                </p>
-                <select
-                  value={m.zona || ''}
-                  onChange={(e) => aggiornaZonaMateriale(m.id, e.target.value)}
-                  className="mt-2 w-full text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-md px-2 py-2 outline-none focus:ring-2 focus:ring-blue-500/30"
-                >
-                  <option value="">Tutte le zone</option>
-                  {ZONE_AMBIENTI.map(z => <option key={z.id} value={z.id}>{z.nome}</option>)}
-                </select>
-              </div>
-              <div className="flex flex-col items-end gap-2 shrink-0">
-                {editingId === m.id ? (
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-slate-400 text-xs">€</span>
-                    <input
-                      autoFocus
-                      type="text"
-                      inputMode="decimal"
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && confirmEdit(m.id)}
-                      className="w-16 px-2 py-1.5 text-sm text-right bg-white border border-blue-300 rounded-md outline-none focus:ring-2 focus:ring-blue-500/30"
-                    />
-                    <button onClick={() => confirmEdit(m.id)} className="text-emerald-600 hover:text-emerald-700 p-1">
-                      <Check className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => startEdit(m)}
-                    className={`font-semibold text-sm rounded-md px-2.5 py-1.5 transition-colors ${
-                      savedFlashId === m.id ? 'bg-emerald-50 text-emerald-700' : 'text-slate-900 bg-slate-50'
-                    }`}
-                  >
-                    {m.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €
-                  </button>
-                )}
-                <button onClick={() => deleteMateriale(m.id)} className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-red-500">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          ))}
-          {materialiFiltrati.length === 0 && (
-            <p className="px-5 py-10 text-center text-sm text-slate-400">
-              {materialiLoading ? 'Caricamento materiali...' : search ? 'Nessun materiale trovato.' : 'Nessun materiale ancora. Aggiungine uno per iniziare il tuo listino.'}
-            </p>
-          )}
-        </div>
-
-        <div className="hidden lg:block overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-100">
-                <th className="text-left font-medium text-slate-500 text-xs px-5 py-3">Materiale</th>
-                <th className="text-left font-medium text-slate-500 text-xs px-5 py-3">Unità</th>
-                <th className="text-left font-medium text-slate-500 text-xs px-5 py-3 hidden md:table-cell">Zona</th>
-                <th className="text-left font-medium text-slate-500 text-xs px-5 py-3 hidden sm:table-cell">Aggiornato</th>
-                <th className="text-right font-medium text-slate-500 text-xs px-5 py-3">Prezzo</th>
-                <th className="px-5 py-3"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {materialiFiltrati.map((m) => (
-                <tr key={m.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60 transition-colors">
-                  <td className="px-5 py-3.5 font-medium text-slate-900">
-                    {renamingId === m.id ? (
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          autoFocus
-                          type="text"
-                          value={renameValue}
-                          onChange={(e) => setRenameValue(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && confirmRename(m.id)}
-                          onBlur={() => confirmRename(m.id)}
-                          className="w-full min-w-[10rem] px-2 py-1 text-sm bg-white border border-blue-300 rounded-md outline-none focus:ring-2 focus:ring-blue-500/30"
-                        />
-                        <button onClick={() => confirmRename(m.id)} className="text-emerald-600 hover:text-emerald-700 shrink-0">
-                          <Check className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ) : (
-                      <button onClick={() => startRename(m)} className="text-left hover:text-blue-600 transition-colors">
-                        {m.nome}
-                      </button>
-                    )}
-                  </td>
-                  <td className="px-5 py-3.5 text-slate-500 font-mono text-xs">{m.unita}</td>
-                  <td className="px-5 py-3.5 hidden md:table-cell">
-                    <select
-                      value={m.zona || ''}
-                      onChange={(e) => aggiornaZonaMateriale(m.id, e.target.value)}
-                      className="text-xs text-slate-500 bg-transparent border border-slate-200 rounded-md px-2 py-2 outline-none focus:ring-2 focus:ring-blue-500/30"
-                    >
-                      <option value="">Tutte le zone</option>
-                      {ZONE_AMBIENTI.map(z => <option key={z.id} value={z.id}>{z.nome}</option>)}
-                    </select>
-                  </td>
-                  <td className="px-5 py-3.5 text-slate-400 text-xs hidden sm:table-cell">{m.ultimoAggiornamento}</td>
-                  <td className="px-5 py-3.5 text-right">
-                    {editingId === m.id ? (
-                      <div className="flex items-center justify-end gap-1.5">
-                        <span className="text-slate-400 text-xs">€</span>
-                        <input
-                          autoFocus
-                          type="text"
-                          inputMode="decimal"
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && confirmEdit(m.id)}
-                          className="w-20 px-2 py-1 text-sm text-right bg-white border border-blue-300 rounded-md outline-none focus:ring-2 focus:ring-blue-500/30"
-                        />
-                        <button onClick={() => confirmEdit(m.id)} className="text-emerald-600 hover:text-emerald-700">
-                          <Check className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => startEdit(m)}
-                        className={`font-semibold transition-colors rounded-md px-2 py-1 ${
-                          savedFlashId === m.id ? 'bg-emerald-50 text-emerald-700' : 'text-slate-900 hover:bg-slate-100'
-                        }`}
-                      >
-                        {m.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €
-                      </button>
-                    )}
-                  </td>
-                  <td className="px-5 py-3.5 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <button onClick={() => startEdit(m)} className="text-slate-400 hover:text-slate-600 p-1">
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={() => deleteMateriale(m.id)} className="text-slate-400 hover:text-red-500 p-1">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {materialiFiltrati.length === 0 && (
-                <tr>
-                  <td colSpan="6" className="px-5 py-10 text-center text-sm text-slate-400">
-                    {materialiLoading ? 'Caricamento materiali...' : search ? 'Nessun materiale trovato.' : 'Nessun materiale ancora. Aggiungine uno per iniziare il tuo listino.'}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /* ============================================================ */
 /* IMPOSTAZIONI — R3 #1: prezzo al km per il calcolo trasferta    */
@@ -6280,15 +5777,10 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
   // così Denis trova subito il pezzo per nome senza dover prima entrare nella categoria giusta
   const ricercaAttiva = queryRicerca.trim().length > 0;
   const risultatiRicerca = ricercaAttiva
-    ? (() => {
-        const q = queryRicerca.trim().toLowerCase();
-        return prodotti.filter(p =>
-          (p.nome || '').toLowerCase().includes(q) ||
-          (p.codice || '').toLowerCase().includes(q) ||
-          (p.descrizione || '').toLowerCase().includes(q) ||
-          (p.sottocategoria || '').toLowerCase().includes(q)
-        );
-      })()
+    ? prodotti.filter(p => corrispondeRicerca(
+        [p.nome, p.codice, p.descrizione, p.sottocategoria, p.categoria, p.fornitore].join(' '),
+        queryRicerca
+      ))
     : [];
 
   // vista a cartelle: dentro una categoria mostriamo prima le sue sottocategorie
@@ -6988,7 +6480,6 @@ const pageConfig = {
   dashboard: { title: 'Dashboard', subtitle: null },
   preventivi: { title: 'Preventivi', subtitle: null },
   clienti: { title: 'Clienti', subtitle: null },
-  materiali: { title: 'Materiali', subtitle: null },
   catalogo: { title: 'Catalogo', subtitle: null },
   squadra: { title: 'Lavori Squadra', subtitle: null },
   impostazioni: { title: 'Impostazioni', subtitle: null },
@@ -7100,8 +6591,6 @@ function App() {
   // stato centrale: tutta l'app legge e scrive da qui
   const [clienti, setClienti] = useState([]);
   const [clientiLoading, setClientiLoading] = useState(true);
-  const [materiali, setMateriali] = useState([]);
-  const [materialiLoading, setMaterialiLoading] = useState(true);
   const [prodotti, setProdotti] = useState([]);
   const [prodottiLoading, setProdottiLoading] = useState(true);
   const [vociLavoro, setVociLavoro] = useState([]);
@@ -7180,24 +6669,6 @@ function App() {
       }
       setPreventivi(data.map(preventivoFromRow));
       setPreventiviLoading(false);
-    });
-    return () => { annullato = true; };
-  }, [session?.user?.id]);
-
-  // materiali: stesso pattern
-  useEffect(() => {
-    if (!session) return;
-    let annullato = false;
-    setMaterialiLoading(true);
-    fetchConRetry(() => sb.from('materiali').select('*').order('nome', { ascending: true })).then(({ data, error }) => {
-      if (annullato) return;
-      if (error) {
-        console.error('Errore nel caricare i materiali da Supabase:', error);
-        setMaterialiLoading(false);
-        return;
-      }
-      setMateriali(data.map(materialeFromRow));
-      setMaterialiLoading(false);
     });
     return () => { annullato = true; };
   }, [session?.user?.id]);
@@ -7351,9 +6822,8 @@ function App() {
             preventivi={preventivi}
             setPreventivi={setPreventivi}
             preventiviLoading={preventiviLoading}
-            materiali={materiali}
-            setMateriali={setMateriali}
             prodotti={prodotti}
+            setProdotti={setProdotti}
             vociLavoro={vociLavoro}
             setVociLavoro={setVociLavoro}
             prezzoKm={impostazioni.prezzo_km}
@@ -7373,7 +6843,6 @@ function App() {
             onApriPreventivo={handleApriPreventivo}
           />
         )}
-        {currentPage === 'materiali' && <MaterialiPage materiali={materiali} setMateriali={setMateriali} materialiLoading={materialiLoading} />}
         {currentPage === 'catalogo' && <CatalogoPage prodotti={prodotti} setProdotti={setProdotti} prodottiLoading={prodottiLoading} />}
         {currentPage === 'impostazioni' && <ImpostazioniPage impostazioni={impostazioni} setImpostazioni={setImpostazioni} />}
         {currentPage === 'squadra' && <SquadraPage preventivi={preventivi} clienti={clienti} />}
