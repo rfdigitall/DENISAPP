@@ -215,7 +215,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202609291000';
+const APP_VERSION = '202609301100';
 
 /* ============================================================
    GOOGLE CALENDAR (Fase 7) — modulo isolato e opzionale.
@@ -3683,6 +3683,15 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
   const [npvUnita, setNpvUnita] = useState('pz');
   const [npvDescrizione, setNpvDescrizione] = useState('');
   const [npvSalvando, setNpvSalvando] = useState(false);
+  // R8 (chiesto da Denis: "l'unica cosa lunga è fare la lista dei materiali,
+  // con l'app che li separa è comodo ma lento e macchinoso") — riga veloce
+  // stile chat: scrivi un materiale per volta, invio, e il sistema lo trova
+  // nel catalogo (riusando prezzo) o lo crea al volo se non esiste, senza
+  // passare da categorie o menu. Sostituisce la navigazione con la scrittura,
+  // che è il modo in cui Denis lavorava già prima (a voce/a memoria).
+  const [chatRigaTesto, setChatRigaTesto] = useState('');
+  const [chatUltimaAzione, setChatUltimaAzione] = useState(null); // { tipo: 'trovato'|'creato', nome, prezzo }
+  const [chatSalvando, setChatSalvando] = useState(false);
   const [savedFlashId, setSavedFlashId] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
   const [riordinaAperto, setRiordinaAperto] = useState(null); // null | 'materiale' | 'lavori' | 'riepilogo'
@@ -4080,6 +4089,70 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
     toggleProdotto(nuovoProdotto);
     setNpvNome(''); setNpvPrezzo(''); setNpvUnita('pz'); setNpvDescrizione('');
     setNuovoProdottoVeloceAperto(false);
+  };
+
+  // a differenza di toggleProdotto (che TOGLIE se già presente, utile quando
+  // tocchi la stessa card due volte per sbaglio), qui riscrivere lo stesso
+  // nome una seconda volta nella riga veloce deve sempre voler dire "un
+  // altro pezzo uguale" — mai rischiare di cancellare per sbaglio una riga
+  // già scritta con fatica
+  const aggiungiOIncrementaProdotto = (p) => {
+    setCarrello(prev => {
+      const esiste = prev.find(i => i.id === p.id);
+      if (esiste) {
+        const nuovaQty = esiste.qty + 1;
+        return prev.map(i => i.id === p.id ? { ...i, qty: nuovaQty, meta: metaProdotto(p, nuovaQty) } : i);
+      }
+      return [...prev, {
+        id: p.id, nome: p.nome, meta: metaProdotto(p, 1), prezzoUnitario: p.prezzo, qty: 1, kind: 'prodotto',
+        unita: p.unita, zona: zonaAttiva, tipoInstallazione: 'nuova',
+        fornitore: p.fornitore, misuraLunghezza: p.misuraLunghezza, misuraProfondita: p.misuraProfondita,
+        misuraAltezza: p.misuraAltezza, descrizioneProdotto: p.descrizione,
+      }];
+    });
+  };
+
+  // R8: "riga veloce" — un materiale per volta, scritto come lo diceva già a
+  // voce/a memoria ("valvola a sfera 18" o "valvola a sfera - 18€"), invio,
+  // e via: trovato nel catalogo riusa il prezzo salvato, altrimenti crea il
+  // prodotto al volo col prezzo scritto. Zero categorie da scegliere prima.
+  const aggiungiRigaChat = async () => {
+    const testo = chatRigaTesto.trim();
+    if (!testo || chatSalvando) return;
+    // il prezzo, se scritto, è l'ultimo numero della riga (con o senza
+    // trattino/€ davanti) — tutto il resto prima è il nome
+    const matchPrezzo = testo.match(/[-–—]?\s*(\d+(?:[.,]\d{1,2})?)\s*€?\s*$/);
+    let nome = testo;
+    let prezzoScritto = null;
+    if (matchPrezzo) {
+      prezzoScritto = parseFloat(matchPrezzo[1].replace(',', '.'));
+      nome = testo.slice(0, matchPrezzo.index).replace(/[-–—]\s*$/, '').trim();
+    }
+    if (!nome) return;
+    setChatRigaTesto('');
+    const esistente = prodotti.find(p => normalizzaRicerca(p.nome) === normalizzaRicerca(nome))
+      || prodotti.find(p => corrispondeRicerca(p.nome, nome));
+    if (esistente) {
+      aggiungiOIncrementaProdotto(esistente);
+      setChatUltimaAzione({ tipo: 'trovato', nome: esistente.nome, prezzo: esistente.prezzo });
+      return;
+    }
+    setChatSalvando(true);
+    const payload = {
+      nome, categoria: activeCat, sottocategoria: 'Generico', tier: 'Standard',
+      prezzo: prezzoScritto || 0, fornitore: 'Generico', unita: 'pz', descrizione: '',
+    };
+    const { data, error } = await sb.from('prodotti').insert(prodottoToRow(payload)).select().single();
+    setChatSalvando(false);
+    if (error) {
+      mostraToast('Errore: ' + error.message);
+      setChatRigaTesto(testo);
+      return;
+    }
+    const nuovoProdotto = prodottoFromRow(data);
+    setProdotti(prev => [nuovoProdotto, ...prev]);
+    aggiungiOIncrementaProdotto(nuovoProdotto);
+    setChatUltimaAzione({ tipo: 'creato', nome, prezzo: prezzoScritto || 0 });
   };
 
   // P3: quantità multiple per i prodotti già nel carrello
@@ -5264,11 +5337,51 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
               </div>
             </div>
 
+            {/* R8: riga veloce stile chat — scrivi un materiale alla volta,
+                come lo dicevi già a memoria, invece di cercarlo nel catalogo.
+                Diventa il modo principale di aggiungere materiali; il
+                catalogo sotto resta come alternativa per chi preferisce
+                sfogliare o non ricorda il nome esatto. */}
+            <div className="app-card overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-slate-100">
+                <p className="text-sm font-semibold text-slate-900">Scrivi un materiale</p>
+                <p className="text-xs text-slate-400 mt-0.5">Nome e prezzo, come lo diresti a voce — es. "Valvola a sfera 1/2 - 18"</p>
+              </div>
+              <div className="p-4">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={chatRigaTesto}
+                    onChange={(e) => setChatRigaTesto(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && aggiungiRigaChat()}
+                    placeholder="Es. Valvola a sfera 1/2 - 18"
+                    disabled={chatSalvando}
+                    className="flex-1 min-w-0 px-3.5 py-3 text-[15px] bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 disabled:opacity-60"
+                  />
+                  <button
+                    type="button"
+                    onClick={aggiungiRigaChat}
+                    disabled={!chatRigaTesto.trim() || chatSalvando}
+                    className="app-ripple shrink-0 w-12 h-12 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 text-white flex items-center justify-center transition-colors"
+                  >
+                    <Plus className="w-5 h-5" />
+                  </button>
+                </div>
+                {chatUltimaAzione && (
+                  <p className={`text-xs font-semibold mt-2.5 ${chatUltimaAzione.tipo === 'trovato' ? 'text-emerald-600' : 'text-blue-600'}`}>
+                    {chatUltimaAzione.tipo === 'trovato'
+                      ? `✓ Trovato nel catalogo: ${chatUltimaAzione.nome} (${chatUltimaAzione.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €)`
+                      : `✓ Nuovo prodotto creato: ${chatUltimaAzione.nome} (${chatUltimaAzione.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €)`}
+                  </p>
+                )}
+              </div>
+            </div>
+
             {/* catalogo — stessa navigazione a cartelle + ricerca del Catalogo vero,
-                ma con "+ Aggiungi" invece di modifica inline */}
+                ma con "+ Aggiungi" invece di modifica inline, per chi preferisce sfogliare */}
             <div className="app-card overflow-hidden">
               <div className="px-5 py-3.5 border-b border-slate-100 space-y-3">
-                <p className="text-sm font-semibold text-slate-900">Catalogo prodotti</p>
+                <p className="text-sm font-semibold text-slate-900">Oppure sfoglia il catalogo</p>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
