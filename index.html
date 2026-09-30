@@ -19,10 +19,14 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   * { box-sizing: border-box; }
+  /* --sab: letta da JS per correggere --app-height in modalità "aggiunta
+     alla schermata Home" su iPhone (vedi syncAppHeight più sotto). */
+  :root { --sab: env(safe-area-inset-bottom, 0px); }
   /* --app-height è impostata via JS (visualViewport): è l'unica misura
      affidabile su iPhone per evitare la striscia bianca sotto menu/barra. */
   html {
     height: var(--app-height, 100%);
+    background: #eef1f5;
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior: none;
   }
@@ -127,12 +131,20 @@ window.addEventListener('error', function (e) {
 (function syncAppHeight() {
   // --app-height è impostata via JS (visualViewport): è l'unica misura
   // affidabile su iPhone per evitare la striscia bianca sotto menu/barra.
-  // (Tentativo di sommare le safe-area per "estendere" oltre questa misura
-  // provato e SCARTATO: su iPhone reale la superficie disegnabile vera del
-  // WebView è esattamente questa, non di più — sommare altro spingeva la
-  // barra di navigazione fuori schermo, invisibile.)
+  // (Un vecchio tentativo di sommare sempre la safe-area qui è stato
+  // SCARTATO: in Safari "a tab" visualViewport.height include già la
+  // safe-area, quindi sommarla di nuovo spingeva la barra fuori schermo.
+  // Ma in modalità "aggiunta alla schermata Home" su iPhone succede il
+  // contrario — lì visualViewport.height la ESCLUDE, lasciando una
+  // striscia bianca vuota sotto la barra di navigazione — quindi la
+  // sommiamo SOLO quando l'app gira in quella modalità, mai in Safari.)
+  var inStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
   var set = function () {
     var h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    if (inStandalone) {
+      var sab = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sab')) || 0;
+      h += sab;
+    }
     document.documentElement.style.setProperty('--app-height', Math.round(h) + 'px');
   };
   set();
@@ -148,7 +160,14 @@ window.addEventListener('error', function (e) {
   // "stacca" e resta un vuoto bianco sopra la barra in basso. Causa: WebKit
   // sposta l'intera pagina (anche se position:fixed) per portare il campo
   // sopra la tastiera — un comportamento nativo indipendente da --app-height.
-  // Fix noto per layout position:fixed su iOS: annullare quello scroll.
+  // Il primo fix (solo azzerare lo scroll) toglieva il vuoto bianco ma
+  // annullava anche lo scroll "verso il campo" che serve per vederlo sopra
+  // la tastiera: risultato, un salto secco e poi bisognava scorrere a mano
+  // per ritrovare dove si stava scrivendo (bug segnalato da RF Digital).
+  // Ora azzeriamo solo lo scroll della pagina esterna (che qui è sempre
+  // fittizio, essendo html/body position:fixed) e SUBITO DOPO scorriamo il
+  // campo stesso dentro il suo contenitore interno scrollabile, così resta
+  // visibile sopra la tastiera senza bisogno di scorrere a mano.
   document.addEventListener('focusin', function (e) {
     var t = e.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) {
@@ -156,6 +175,7 @@ window.addEventListener('error', function (e) {
         window.scrollTo(0, 0);
         document.body.scrollTop = 0;
         document.documentElement.scrollTop = 0;
+        t.scrollIntoView({ block: 'center', behavior: 'smooth' });
       }, 50);
     }
   });
@@ -195,7 +215,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202609211200';
+const APP_VERSION = '202609291000';
 
 /* ============================================================
    GOOGLE CALENDAR (Fase 7) — modulo isolato e opzionale.
@@ -865,6 +885,14 @@ const TrendingUp = makeIcon('TrendingUp', [
   ['path', { d: 'M16 7h6v6' }]
 ]);
 
+const Share2 = makeIcon('Share2', [
+  ['circle', { cx: '18', cy: '5', r: '3' }],
+  ['circle', { cx: '6', cy: '12', r: '3' }],
+  ['circle', { cx: '18', cy: '19', r: '3' }],
+  ['line', { x1: '8.59', y1: '13.51', x2: '15.42', y2: '17.49' }],
+  ['line', { x1: '15.41', y1: '6.51', x2: '8.59', y2: '10.49' }]
+]);
+
 const MoreHorizontal = makeIcon('MoreHorizontal', [
   ['circle', { cx: 12, cy: 12, r: 1 }],
   ['circle', { cx: 19, cy: 12, r: 1 }],
@@ -1143,6 +1171,12 @@ function dicituraDefaultVoce(item) {
     // il fornitore NON entra mai nel nome/titolo mostrato — resta un campo/filtro
     // separato altrove (scheda prodotto, filtri catalogo), non nella dicitura
     let frase = item.nome;
+    // quantità/unità in stampa solo per unità diverse da "pezzo" (litri, kg,
+    // metri...) — un "1 pz" sottinteso non serve, ma "5 litri" sì (segnalato
+    // da Denis: senza, il cliente non sa quanto Sentinel viene fornito)
+    if (item.unita && item.unita !== 'pz') {
+      frase += ` (${item.qty} ${item.unita})`;
+    }
     if (item.misuraLunghezza || item.misuraProfondita || item.misuraAltezza) {
       frase += `, misure ${item.misuraLunghezza || '–'}×${item.misuraProfondita || '–'}×${item.misuraAltezza || '–'} cm`;
     }
@@ -1252,7 +1286,7 @@ function addFooterCliente(doc, pagina, totalePagine) {
 
 const MARGINE_BASSO = 262; // oltre questa y si passa a una nuova pagina
 
-async function generaPDFCliente({ cliente, carrello, diciture, totale, nextId, logoB64 }) {
+async function generaPDFCliente({ cliente, carrello, diciture, totale, nextId, logoB64, modalita = 'scarica' }) {
   const jsPDF = await loadJsPDF();
   const doc = new jsPDF({ unit:'mm', format:'a4', orientation:'portrait' });
 
@@ -1359,24 +1393,28 @@ async function generaPDFCliente({ cliente, carrello, diciture, totale, nextId, l
     addFooterCliente(doc, i, totalePagine);
   }
 
-  // R3 #2: invio al cliente — se il telefono supporta la condivisione con
-  // file (iOS/Android), apre il menu nativo (Mail, WhatsApp...) con il PDF
-  // già pronto da allegare, invece di scaricarlo soltanto. Su desktop (o se
-  // il telefono non lo supporta) resta il download di sempre.
+  // R7 (chiesto da Denis): scelta esplicita "Scarica" o "Invia direttamente",
+  // niente più decisione automatica in base al dispositivo — prima capitava
+  // che si aprisse da sola la condivisione anche quando si voleva solo
+  // scaricare il file, o viceversa.
   const nomeFile = `Preventivo_${cliente.nome.replace(/\s/g,'_')}_${nextId}.pdf`;
   const blob = doc.output('blob');
-  const file = new File([blob], nomeFile, { type: 'application/pdf' });
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try {
-      await navigator.share({
-        files: [file],
-        title: `Preventivo ${nextId}`,
-        text: `Preventivo per ${cliente.nome} — Ferari Impianti`,
-      });
-      return;
-    } catch (err) {
-      if (err && err.name === 'AbortError') return; // Denis ha annullato la condivisione
-      // altrimenti prosegue con il download normale qui sotto
+  if (modalita === 'condividi') {
+    const file = new File([blob], nomeFile, { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: `Preventivo ${nextId}`,
+          text: `Preventivo per ${cliente.nome} — Ferari Impianti`,
+        });
+        return;
+      } catch (err) {
+        if (err && err.name === 'AbortError') return; // Denis ha annullato la condivisione
+        // altrimenti scarica comunque qui sotto, come ripiego
+      }
+    } else {
+      mostraToast('Condivisione non disponibile su questo dispositivo, ho scaricato il PDF.', 'info');
     }
   }
   doc.save(nomeFile);
@@ -1546,6 +1584,10 @@ const CATALOGO_STRUTTURA = {
       'Illuminazione (specchiere)',
     ],
   },
+  // "Generico": per prodotti che non vengono da nessuno dei 3 fornitori
+  // sopra (es. prodotti chimici come il Sentinel) — nessuna sottocategoria
+  // fissa, il form userà sempre il campo di testo libero per quella.
+  Generico: {},
 };
 
 const FORNITORI_CATALOGO = Object.keys(CATALOGO_STRUTTURA);
@@ -3548,6 +3590,51 @@ function cancellaBozzaCliente(clienteId) {
   } catch (err) { /* niente */ }
 }
 
+// R7: pannello a comparsa dal basso con la scelta esplicita "Scarica" /
+// "Invia direttamente" per il PDF cliente — sostituisce la vecchia decisione
+// automatica in base al dispositivo (chiesto da Denis).
+function PdfClienteSceltaModal({ dati, onScegli, onChiudi }) {
+  if (!dati) return null;
+  return (
+    <div className="fixed inset-0 z-[110] flex items-end lg:items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onChiudi} />
+      <div className="relative bg-white rounded-t-[1.75rem] lg:rounded-2xl w-full max-w-sm mx-auto px-6 pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] lg:pb-6 shadow-[0_-8px_40px_rgba(0,0,0,0.18)]">
+        <p className="text-sm font-semibold text-slate-900 mb-1">PDF per il Cliente</p>
+        <p className="text-xs text-slate-500 mb-5">Come vuoi procedere?</p>
+        <div className="space-y-2.5">
+          <button
+            type="button"
+            onClick={() => onScegli('scarica')}
+            className="app-ripple w-full flex items-center gap-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl px-4 py-3.5 text-left transition-colors"
+          >
+            <span className="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center shrink-0">
+              <Download className="w-4 h-4" />
+            </span>
+            <span>
+              <span className="block text-sm font-semibold text-slate-900">Scarica PDF</span>
+              <span className="block text-[11px] text-slate-500">Salva il file sul telefono</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onScegli('condividi')}
+            className="app-ripple w-full flex items-center gap-3 bg-blue-50 hover:bg-blue-100 border border-blue-100 rounded-xl px-4 py-3.5 text-left transition-colors"
+          >
+            <span className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
+              <Share2 className="w-4 h-4" />
+            </span>
+            <span>
+              <span className="block text-sm font-semibold text-blue-700">Invia direttamente</span>
+              <span className="block text-[11px] text-blue-500">WhatsApp, Mail e altre app</span>
+            </span>
+          </button>
+        </div>
+        <button onClick={onChiudi} className="w-full text-slate-400 text-xs py-3 mt-1">Annulla</button>
+      </div>
+    </div>
+  );
+}
+
 /* ============================================================ */
 /* PREVENTIVI PAGE                                               */
 /* ============================================================ */
@@ -3587,6 +3674,15 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
   const [activeCat, setActiveCat] = useState(categorieCatalogo[0]);
   const [activeSubCatalogo, setActiveSubCatalogo] = useState('Tutte');
   const [queryCatalogoPreventivo, setQueryCatalogoPreventivo] = useState('');
+  // R7 (chiesto da Denis): creare un prodotto nuovo senza dover uscire dal
+  // preventivo per andare in Catalogo Prodotti — un mini-form veloce, con
+  // solo i campi essenziali (il resto si completa con calma più tardi).
+  const [nuovoProdottoVeloceAperto, setNuovoProdottoVeloceAperto] = useState(false);
+  const [npvNome, setNpvNome] = useState('');
+  const [npvPrezzo, setNpvPrezzo] = useState('');
+  const [npvUnita, setNpvUnita] = useState('pz');
+  const [npvDescrizione, setNpvDescrizione] = useState('');
+  const [npvSalvando, setNpvSalvando] = useState(false);
   const [savedFlashId, setSavedFlashId] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
   const [riordinaAperto, setRiordinaAperto] = useState(null); // null | 'materiale' | 'lavori' | 'riepilogo'
@@ -3606,6 +3702,14 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
   // accorgesse prima. Ora anche qui c'è un'anteprima obbligatoria.
   const [showPreviewDett, setShowPreviewDett] = useState(false);
   const [previewViewDett, setPreviewViewDett] = useState('cliente'); // 'cliente' | 'interno'
+  // R7: scelta esplicita "Scarica" / "Invia direttamente" per il PDF cliente
+  // (prima decideva da sola l'app in base al dispositivo, e non andava bene)
+  const [pdfClienteDati, setPdfClienteDati] = useState(null);
+  const scegliPdfCliente = async (modalita) => {
+    const dati = pdfClienteDati;
+    setPdfClienteDati(null);
+    if (dati) await generaPDFCliente({ ...dati, modalita });
+  };
 
   const setTestoVoce = (itemId, testo) => setDiciture(prev => ({ ...prev, [itemId]: { ...prev[itemId], testo } }));
 
@@ -3930,8 +4034,10 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
     } : i));
   };
 
-  const metaProdotto = (p, qty) => p.unita === 'm'
-    ? `${qty} m × ${p.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €`
+  // vale per qualunque unità diversa da "pezzo" (metri, litri, kg...) — non
+  // solo per i cavi al metro come all'inizio, stesso meccanismo riusato
+  const metaProdotto = (p, qty) => (p.unita && p.unita !== 'pz')
+    ? `${qty} ${p.unita} × ${p.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €`
     : p.tier;
 
   const toggleProdotto = (p) => {
@@ -3949,6 +4055,33 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
     }
   };
 
+  // R7: crea un prodotto al volo dal preventivo (senza uscire per andare in
+  // Catalogo Prodotti) e lo aggiunge subito al carrello — campi minimi,
+  // fornitore/misure/codice si possono completare con calma dopo da Catalogo
+  // Prodotti se servono. Misure NON richieste (stessa ragione del Catalogo:
+  // non tutti i prodotti hanno dimensioni sensate, es. un prodotto chimico).
+  const creaProdottoVeloce = async () => {
+    const nome = npvNome.trim();
+    if (!nome) return;
+    setNpvSalvando(true);
+    const prezzo = parseFloat((npvPrezzo || '0').replace(',', '.')) || 0;
+    const payload = {
+      nome, categoria: activeCat, sottocategoria: 'Generico', tier: 'Standard',
+      prezzo, fornitore: 'Generico', unita: npvUnita, descrizione: npvDescrizione.trim(),
+    };
+    const { data, error } = await sb.from('prodotti').insert(prodottoToRow(payload)).select().single();
+    setNpvSalvando(false);
+    if (error) {
+      mostraToast('Errore nel creare il prodotto: ' + error.message);
+      return;
+    }
+    const nuovoProdotto = prodottoFromRow(data);
+    setProdotti(prev => [nuovoProdotto, ...prev]);
+    toggleProdotto(nuovoProdotto);
+    setNpvNome(''); setNpvPrezzo(''); setNpvUnita('pz'); setNpvDescrizione('');
+    setNuovoProdottoVeloceAperto(false);
+  };
+
   // P3: quantità multiple per i prodotti già nel carrello
   // R5 (segnalato da Deborah/Denis): per i prodotti venduti al metro (cavi,
   // tubi...) cliccare + una cifra alla volta era impraticabile — stessa
@@ -3958,7 +4091,7 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
   const aggiornaQtyProdotto = (id, qty) => {
     setCarrello(prev => {
       if (qty <= 0) return prev.filter(i => i.id !== id);
-      return prev.map(i => i.id === id ? { ...i, qty, meta: i.unita === 'm' ? `${qty} m × ${i.prezzoUnitario.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €` : i.meta } : i);
+      return prev.map(i => i.id === id ? { ...i, qty, meta: (i.unita && i.unita !== 'pz') ? `${qty} ${i.unita} × ${i.prezzoUnitario.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €` : i.meta } : i);
     });
   };
 
@@ -4608,9 +4741,9 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
               <div className="px-5 py-4 border-t border-slate-100 shrink-0">
                 <div className="flex gap-2.5 mb-2.5">
                   <button
-                    onClick={async () => {
+                    onClick={() => {
                       if (!clienteDett) return;
-                      await generaPDFCliente({ cliente: clienteDett, carrello: carrelloDett, diciture: p.diciture || {}, totale: p.importo, nextId: p.id, logoB64: LOGO_TRASPARENTE_BASE64 });
+                      setPdfClienteDati({ cliente: clienteDett, carrello: carrelloDett, diciture: p.diciture || {}, totale: p.importo, nextId: p.id, logoB64: LOGO_TRASPARENTE_BASE64 });
                     }}
                     className="app-ripple flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
                   >
@@ -4641,6 +4774,7 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
           luogo={clienteDett?.gpsMapsUrl ? `${clienteDett.indirizzo} (${clienteDett.gpsMapsUrl})` : (clienteDett?.indirizzo || p.cantiere)}
           descrizione={`Preventivo: ${p.id}${clienteDett?.telefono ? `\nTelefono: ${clienteDett.telefono}` : ''}`}
         />
+        <PdfClienteSceltaModal dati={pdfClienteDati} onScegli={scegliPdfCliente} onChiudi={() => setPdfClienteDati(null)} />
       </div>
     );
   }
@@ -5286,10 +5420,74 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
                     </div>
                   )}
 
-                  {prodottiCatalogoPreventivo.length === 0 && (
-                    <p className="text-xs text-slate-400 text-center py-6 px-5">
-                      {ricercaCatalogoAttiva ? 'Nessun prodotto trovato.' : 'Nessun prodotto per questa zona in questa categoria.'}
-                    </p>
+                  {prodottiCatalogoPreventivo.length === 0 && !nuovoProdottoVeloceAperto && (
+                    <div className="text-center py-6 px-5">
+                      <p className="text-xs text-slate-400 mb-3">
+                        {ricercaCatalogoAttiva ? 'Nessun prodotto trovato.' : 'Nessun prodotto per questa zona in questa categoria.'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => { setNpvNome(queryCatalogoPreventivo.trim()); setNuovoProdottoVeloceAperto(true); }}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3.5 py-2 rounded-full transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Crea come nuovo prodotto
+                      </button>
+                    </div>
+                  )}
+
+                  {nuovoProdottoVeloceAperto && (
+                    <div className="mx-4 mb-4 p-4 rounded-xl border border-blue-200 bg-blue-50/40 space-y-2.5">
+                      <p className="text-xs font-semibold text-slate-600">Nuovo prodotto in "{activeCat}"</p>
+                      <input
+                        type="text"
+                        value={npvNome}
+                        onChange={(e) => setNpvNome(e.target.value)}
+                        placeholder="Nome prodotto"
+                        autoFocus
+                        className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                      />
+                      <div className="flex gap-2.5">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={npvPrezzo}
+                          onChange={(e) => setNpvPrezzo(e.target.value)}
+                          placeholder="Prezzo €"
+                          className="flex-1 min-w-0 px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                        />
+                        <select
+                          value={npvUnita}
+                          onChange={(e) => setNpvUnita(e.target.value)}
+                          className="px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                        >
+                          <option value="pz">Pezzo</option>
+                          <option value="m">Metro</option>
+                          <option value="litri">Litri</option>
+                          <option value="kg">Kg</option>
+                        </select>
+                      </div>
+                      <textarea
+                        value={npvDescrizione}
+                        onChange={(e) => setNpvDescrizione(e.target.value)}
+                        rows={2}
+                        placeholder="Descrizione per il cliente (facoltativa, ma aiuta a evitare domande)"
+                        className="w-full px-3 py-2 text-sm bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 resize-none"
+                      />
+                      <div className="flex items-center justify-end gap-2 pt-0.5">
+                        <button type="button" onClick={() => setNuovoProdottoVeloceAperto(false)} className="px-3 py-2 text-xs text-slate-400 hover:text-slate-600">
+                          Annulla
+                        </button>
+                        <button
+                          type="button"
+                          onClick={creaProdottoVeloce}
+                          disabled={npvSalvando || !npvNome.trim()}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-60"
+                        >
+                          {npvSalvando ? 'Creo...' : 'Crea e aggiungi al preventivo'}
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </>
               )}
@@ -5585,8 +5783,8 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
               <div className="flex gap-2.5 mb-2.5">
                 {/* PDF per il Cliente */}
                 <button
-                  onClick={async () => {
-                    await generaPDFCliente({
+                  onClick={() => {
+                    setPdfClienteDati({
                       cliente,
                       carrello,
                       diciture,
@@ -5706,6 +5904,8 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
           </div>
         </div>
       )}
+
+      <PdfClienteSceltaModal dati={pdfClienteDati} onScegli={scegliPdfCliente} onChiudi={() => setPdfClienteDati(null)} />
     </div>
   );
 }
@@ -5788,6 +5988,11 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
   const [newLunghezza, setNewLunghezza] = useState('');
   const [newProfondita, setNewProfondita] = useState('');
   const [newAltezza, setNewAltezza] = useState('');
+  const [newUnita, setNewUnita] = useState('pz');
+  const [subNuova, setSubNuova] = useState(false);
+  const [rinominaSub, setRinominaSub] = useState(null);
+  const [rinominaValore, setRinominaValore] = useState('');
+  const [rinominandoSub, setRinominandoSub] = useState(false);
   const [newSchedaUrl, setNewSchedaUrl] = useState('');
   const [newFotoFile, setNewFotoFile] = useState(null);
   const [salvandoNuovo, setSalvandoNuovo] = useState(false);
@@ -5795,6 +6000,7 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
   const [editingId, setEditingId] = useState(null);
   const [editNome, setEditNome] = useState('');
   const [editPrezzo, setEditPrezzo] = useState('');
+  const [editDescrizione, setEditDescrizione] = useState('');
   const [caricandoFotoId, setCaricandoFotoId] = useState(null);
 
   const prodottiCategoria = prodotti.filter(p => p.categoria === activeCat && (activeFornitoreFiltro === 'Tutti' || p.fornitore === activeFornitoreFiltro));
@@ -5825,23 +6031,30 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
   const prodottiBagno = prodottiDaMostrare.filter(p => p.categoria === 'Bagno');
 
   const fornitoreForm = newFornitore || fornitoreDiCategoria(activeCat) || FORNITORI_CATALOGO[0];
-  const sottocategorieStruttura = CATALOGO_STRUTTURA[fornitoreForm]?.[activeCat] || [];
+  // le sottocategorie proposte nel form non sono più SOLO quelle fisse di
+  // CATALOGO_STRUTTURA (un elenco che solo lo sviluppatore può cambiare) —
+  // si aggiungono anche quelle già in uso davvero su questo fornitore+
+  // categoria, così una sottocategoria creata al volo resta selezionabile
+  // anche dopo, senza dover ritoccare il codice (chiesto da Denis/Deborah)
+  const sottocategorieStruttura = [...new Set([
+    ...(CATALOGO_STRUTTURA[fornitoreForm]?.[activeCat] || []),
+    ...prodotti.filter(p => p.fornitore === fornitoreForm && p.categoria === activeCat).map(p => p.sottocategoria).filter(Boolean),
+  ])].sort();
 
   const addProdotto = async () => {
     if (!newNome.trim()) return;
-    const lunghezza = parseFloat((newLunghezza || '').replace(',', '.'));
-    const profondita = parseFloat((newProfondita || '').replace(',', '.'));
-    const altezza = parseFloat((newAltezza || '').replace(',', '.'));
-    if (!lunghezza || !profondita || !altezza) {
-      setErroreNuovo('Inserisci tutte le misure: lunghezza, profondità e altezza.');
-      return;
-    }
+    // Misure NON più obbligatorie (segnalato da Denis: un prodotto chimico
+    // come il Sentinel non ha lunghezza/profondità/altezza — obbligarle
+    // portava solo a valori finti tipo "1×1×1" scritti pur di salvare).
+    const lunghezza = newLunghezza.trim() ? parseFloat(newLunghezza.replace(',', '.')) : null;
+    const profondita = newProfondita.trim() ? parseFloat(newProfondita.replace(',', '.')) : null;
+    const altezza = newAltezza.trim() ? parseFloat(newAltezza.replace(',', '.')) : null;
     setSalvandoNuovo(true);
     setErroreNuovo('');
     const prezzo = parseFloat((newPrezzo || '0').replace(',', '.')) || 0;
     const payload = {
       nome: newNome.trim(), categoria: activeCat, sottocategoria: newSub.trim() || 'Generico',
-      tier: newTier, prezzo, fornitore: fornitoreForm, codice: newCodice.trim(),
+      tier: newTier, prezzo, fornitore: fornitoreForm, codice: newCodice.trim(), unita: newUnita,
       descrizione: newDescrizione.trim(), misuraLunghezza: lunghezza, misuraProfondita: profondita,
       misuraAltezza: altezza, schedaTecnicaUrl: newSchedaUrl.trim(),
     };
@@ -5858,8 +6071,10 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
     setNewNome('');
     setNewFornitore('');
     setNewSub('');
+    setSubNuova(false);
     setNewTier('Standard');
     setNewPrezzo('');
+    setNewUnita('pz');
     setNewCodice('');
     setNewDescrizione('');
     setNewLunghezza('');
@@ -5879,10 +6094,34 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
     setProdotti(prodotti.filter(p => p.id !== id));
   };
 
+  // Rinomina una sottocategoria su TUTTI i prodotti che la usano in un colpo
+  // solo — chiesto da Denis/Deborah, che prima non avevano modo di correggere
+  // il nome di una cartella senza modificare ogni prodotto uno per uno.
+  const salvaRinominaSottocategoria = async (vecchioNome) => {
+    const nuovoNome = rinominaValore.trim();
+    if (!nuovoNome || nuovoNome === vecchioNome) { setRinominaSub(null); return; }
+    setRinominandoSub(true);
+    // rinomina su tutti i prodotti di questa categoria (e, se stiamo filtrando
+    // per un fornitore specifico, solo quel fornitore) con quel vecchio nome
+    let query = sb.from('prodotti').update({ sottocategoria: nuovoNome }).eq('categoria', activeCat).eq('sottocategoria', vecchioNome);
+    if (activeFornitoreFiltro !== 'Tutti') query = query.eq('fornitore', activeFornitoreFiltro);
+    const { error } = await query;
+    setRinominandoSub(false);
+    if (error) {
+      mostraToast('Errore nel rinominare: ' + error.message);
+      return;
+    }
+    setProdotti(prev => prev.map(p => (p.categoria === activeCat && p.sottocategoria === vecchioNome && (activeFornitoreFiltro === 'Tutti' || p.fornitore === activeFornitoreFiltro))
+      ? { ...p, sottocategoria: nuovoNome } : p));
+    setRinominaSub(null);
+    if (activeSub === vecchioNome) setActiveSub(nuovoNome);
+  };
+
   const startEditProdotto = (p) => {
     setEditingId(p.id);
     setEditNome(p.nome);
     setEditPrezzo(String(p.prezzo).replace('.', ','));
+    setEditDescrizione(p.descrizione || '');
   };
 
   const aggiornaZonaProdotto = async (id, zona) => {
@@ -5897,14 +6136,15 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
   const confirmEditProdotto = async (id) => {
     const nome = editNome.trim();
     const prezzo = parseFloat(editPrezzo.replace(',', '.'));
+    const descrizione = editDescrizione.trim();
     setEditingId(null);
     if (!nome || isNaN(prezzo) || prezzo <= 0) return;
-    const { error } = await sb.from('prodotti').update({ nome, prezzo }).eq('id', id);
+    const { error } = await sb.from('prodotti').update({ nome, prezzo, descrizione }).eq('id', id);
     if (error) {
       mostraToast('Errore nel salvare le modifiche: ' + error.message);
       return;
     }
-    setProdotti(prodotti.map(p => p.id === id ? { ...p, nome, prezzo } : p));
+    setProdotti(prodotti.map(p => p.id === id ? { ...p, nome, prezzo, descrizione } : p));
   };
 
   const cambiaFotoProdotto = async (p, file) => {
@@ -6011,22 +6251,38 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
           {mostraCartelle && (
             <div className="app-card overflow-hidden divide-y divide-slate-50">
               {conteggioSottocategorie.map(({ nome, count }) => (
-                <button
-                  key={nome}
-                  onClick={() => setActiveSub(nome)}
-                  className="w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left hover:bg-slate-50 active:bg-slate-100 transition-colors"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                      <ShoppingBag className="w-4 h-4 text-blue-600" />
+                rinominaSub === nome ? (
+                  <div key={nome} className="flex items-center gap-2 px-4 py-2.5">
+                    <input
+                      type="text"
+                      value={rinominaValore}
+                      onChange={(e) => setRinominaValore(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && salvaRinominaSottocategoria(nome)}
+                      autoFocus
+                      className="flex-1 min-w-0 px-3 py-1.5 text-sm bg-slate-50 border border-blue-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30"
+                    />
+                    <button onClick={() => salvaRinominaSottocategoria(nome)} disabled={rinominandoSub} className="shrink-0 text-blue-600 font-semibold text-xs px-2 py-1.5">
+                      {rinominandoSub ? '...' : 'Salva'}
+                    </button>
+                    <button onClick={() => setRinominaSub(null)} className="shrink-0 text-slate-400 p-1.5"><X className="w-4 h-4" /></button>
+                  </div>
+                ) : (
+                  <div key={nome} className="w-full flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100 transition-colors">
+                    <button onClick={() => setActiveSub(nome)} className="flex items-center gap-3 min-w-0 flex-1 text-left">
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                        <ShoppingBag className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <p className="text-[13.5px] font-semibold text-slate-900 truncate">{nome}</p>
+                    </button>
+                    <div className="flex items-center gap-2.5 shrink-0">
+                      <span className="text-[11px] text-slate-400 font-medium whitespace-nowrap">{count} prodott{count === 1 ? 'o' : 'i'}</span>
+                      <button onClick={() => { setRinominaSub(nome); setRinominaValore(nome); }} className="text-slate-300 hover:text-slate-600 p-1">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => setActiveSub(nome)}><ChevronRight className="w-4 h-4 text-slate-300" /></button>
                     </div>
-                    <p className="text-[13.5px] font-semibold text-slate-900 truncate">{nome}</p>
                   </div>
-                  <div className="flex items-center gap-2.5 shrink-0">
-                    <span className="text-[11px] text-slate-400 font-medium whitespace-nowrap">{count} prodott{count === 1 ? 'o' : 'i'}</span>
-                    <ChevronRight className="w-4 h-4 text-slate-300" />
-                  </div>
-                </button>
+                )
               ))}
             </div>
           )}
@@ -6063,23 +6319,35 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <div>
               <label className="block text-[11px] font-medium text-slate-500 mb-1">Sottocategoria</label>
-              {sottocategorieStruttura.length > 0 ? (
+              {sottocategorieStruttura.length > 0 && !subNuova ? (
                 <select
                   value={newSub}
-                  onChange={(e) => setNewSub(e.target.value)}
+                  onChange={(e) => {
+                    if (e.target.value === '__nuova__') { setSubNuova(true); setNewSub(''); }
+                    else setNewSub(e.target.value);
+                  }}
                   className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
                 >
                   <option value="">Scegli...</option>
                   {sottocategorieStruttura.map(s => <option key={s} value={s}>{s}</option>)}
+                  <option value="__nuova__">+ Nuova sottocategoria...</option>
                 </select>
               ) : (
-                <input
-                  type="text"
-                  value={newSub}
-                  onChange={(e) => setNewSub(e.target.value)}
-                  placeholder="Es. Filo muro"
-                  className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
-                />
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={newSub}
+                    onChange={(e) => setNewSub(e.target.value)}
+                    placeholder="Es. Filo muro"
+                    autoFocus={subNuova}
+                    className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+                  />
+                  {sottocategorieStruttura.length > 0 && (
+                    <button type="button" onClick={() => { setSubNuova(false); setNewSub(''); }} className="shrink-0 text-slate-400 hover:text-slate-600 p-1">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
               )}
             </div>
             <div>
@@ -6106,7 +6374,7 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
             <div>
               <label className="block text-[11px] font-medium text-slate-500 mb-1">Prezzo €</label>
               <input
@@ -6119,7 +6387,20 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
               />
             </div>
             <div>
-              <label className="block text-[11px] font-medium text-slate-500 mb-1">Lunghezza cm</label>
+              <label className="block text-[11px] font-medium text-slate-500 mb-1">Unità</label>
+              <select
+                value={newUnita}
+                onChange={(e) => setNewUnita(e.target.value)}
+                className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500"
+              >
+                <option value="pz">Pezzo</option>
+                <option value="m">Metro</option>
+                <option value="litri">Litri</option>
+                <option value="kg">Kg</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-slate-500 mb-1">Lunghezza cm (facoltativa)</label>
               <input
                 type="text"
                 inputMode="decimal"
@@ -6130,7 +6411,7 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
               />
             </div>
             <div>
-              <label className="block text-[11px] font-medium text-slate-500 mb-1">Profondità cm</label>
+              <label className="block text-[11px] font-medium text-slate-500 mb-1">Profondità cm (facoltativa)</label>
               <input
                 type="text"
                 inputMode="decimal"
@@ -6141,7 +6422,7 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
               />
             </div>
             <div>
-              <label className="block text-[11px] font-medium text-slate-500 mb-1">Altezza cm</label>
+              <label className="block text-[11px] font-medium text-slate-500 mb-1">Altezza cm (facoltativa)</label>
               <input
                 type="text"
                 inputMode="decimal"
@@ -6277,6 +6558,13 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
+                        <textarea
+                          value={editDescrizione}
+                          onChange={(e) => setEditDescrizione(e.target.value)}
+                          rows={2}
+                          placeholder="Descrizione per il cliente — cos'è questo prodotto?"
+                          className="w-full px-2 py-1.5 text-xs bg-white border border-blue-300 rounded-md outline-none focus:ring-2 focus:ring-blue-500/30 resize-none"
+                        />
                       </div>
                     ) : (
                       <div className="flex items-center justify-between gap-3">
@@ -6287,6 +6575,9 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
                           <span className="min-w-0">
                             <p className="text-[13px] font-semibold text-slate-900 truncate group-hover/edit:text-blue-600 transition-colors">{p.nome}</p>
                             {sottotitolo && <p className="text-[11px] text-slate-400 truncate mt-0.5">{sottotitolo}</p>}
+                            {!p.descrizione && (
+                              <p className="text-[10px] font-semibold text-amber-600 mt-0.5">⚠ manca descrizione — il cliente non saprà cos'è</p>
+                            )}
                           </span>
                         </button>
                         <div className="flex items-center gap-2.5 shrink-0">
@@ -6372,6 +6663,13 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
                             <Check className="w-4 h-4" />
                           </button>
                         </div>
+                        <textarea
+                          value={editDescrizione}
+                          onChange={(e) => setEditDescrizione(e.target.value)}
+                          rows={2}
+                          placeholder="Descrizione per il cliente — cos'è questo prodotto?"
+                          className="w-full px-2 py-1.5 text-xs bg-white border border-blue-300 rounded-md outline-none focus:ring-2 focus:ring-blue-500/30 resize-none"
+                        />
                       </div>
                     ) : (
                       <button onClick={() => startEditProdotto(p)} className="text-left w-full group/edit">
@@ -6389,8 +6687,10 @@ function CatalogoPage({ prodotti, setProdotti, prodottiLoading }) {
                         )}
                       </button>
                     )}
-                    {p.descrizione && (
+                    {p.descrizione ? (
                       <p className="text-[11px] text-slate-500 mt-1.5 line-clamp-2">{p.descrizione}</p>
+                    ) : (
+                      <p className="text-[10px] font-semibold text-amber-600 mt-1.5">⚠ manca descrizione</p>
                     )}
                     {p.schedaTecnicaUrl && (
                       <a
