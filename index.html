@@ -139,6 +139,16 @@ window.addEventListener('error', function (e) {
   // striscia bianca vuota sotto la barra di navigazione — quindi la
   // sommiamo SOLO quando l'app gira in quella modalità, mai in Safari.)
   var inStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  // R9 (bug reale trovato con un video di Denis sul suo iPhone): quando si
+  // apre la tastiera, WebKit sposta il "visual viewport" rispetto al layout
+  // viewport per portare il campo sopra la tastiera — anche con
+  // position:fixed, che normalmente dovrebbe restare ancorato. Il vecchio
+  // fix (azzerare lo scroll a mano) combatteva contro questo spostamento e
+  // causava proprio il "salto, ba su ba giù" visto nel video. La correzione
+  // giusta non è annullare lo spostamento, ma SEGUIRLO: leggiamo
+  // visualViewport.offsetTop (di quanto si è spostato) e spostiamo il nostro
+  // contenitore fisso della stessa quantità, così resta sempre allineato,
+  // niente più stacco né spazio vuoto.
   var set = function () {
     var h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
     if (inStandalone) {
@@ -146,6 +156,8 @@ window.addEventListener('error', function (e) {
       h += sab;
     }
     document.documentElement.style.setProperty('--app-height', Math.round(h) + 'px');
+    var offset = window.visualViewport ? window.visualViewport.offsetTop : 0;
+    document.body.style.transform = offset ? 'translateY(' + Math.round(offset) + 'px)' : '';
   };
   set();
   window.addEventListener('resize', set);
@@ -156,25 +168,13 @@ window.addEventListener('error', function (e) {
   }
 })();
 (function fixTastieraIOS() {
-  // Bug segnalato da Denis: aprendo la tastiera su iPhone, il contenuto si
-  // "stacca" e resta un vuoto bianco sopra la barra in basso. Causa: WebKit
-  // sposta l'intera pagina (anche se position:fixed) per portare il campo
-  // sopra la tastiera — un comportamento nativo indipendente da --app-height.
-  // Il primo fix (solo azzerare lo scroll) toglieva il vuoto bianco ma
-  // annullava anche lo scroll "verso il campo" che serve per vederlo sopra
-  // la tastiera: risultato, un salto secco e poi bisognava scorrere a mano
-  // per ritrovare dove si stava scrivendo (bug segnalato da RF Digital).
-  // Ora azzeriamo solo lo scroll della pagina esterna (che qui è sempre
-  // fittizio, essendo html/body position:fixed) e SUBITO DOPO scorriamo il
-  // campo stesso dentro il suo contenitore interno scrollabile, così resta
-  // visibile sopra la tastiera senza bisogno di scorrere a mano.
+  // Con lo spostamento ora gestito sopra (syncAppHeight), qui basta portare
+  // il campo appena toccato ben visibile sopra la tastiera — una volta sola,
+  // senza più combattere contro lo scroll nativo di WebKit.
   document.addEventListener('focusin', function (e) {
     var t = e.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) {
       setTimeout(function () {
-        window.scrollTo(0, 0);
-        document.body.scrollTop = 0;
-        document.documentElement.scrollTop = 0;
         t.scrollIntoView({ block: 'center', behavior: 'smooth' });
       }, 50);
     }
@@ -215,7 +215,19 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202609301100';
+const APP_VERSION = '202609301900';
+
+// R10 (chiesto da Denis: dopo un push non si vedeva conferma che l'app si
+// fosse aggiornata) — TENTATIVO IN SOSPESO, non ancora funzionante: la
+// logica per mostrare un avviso "aggiornato" dopo un reload è stata provata
+// in più forme (evento, flag di modulo, ritardo) ma il toast non arrivava
+// mai a schermo per una causa non ancora isolata (la funzione veniva
+// chiamata correttamente, dimostrato via console.log, ma il DOM non
+// mostrava mai il risultato). Riportato allo stato precedente (nessun
+// avviso di "aggiornato", solo il banner "versione nuova disponibile" prima
+// dell'aggiornamento, che funziona) per non lasciare codice a metà. Da
+// riprendere con un approccio DOM diretto (fuori da React) invece di
+// useState/useEffect.
 
 /* ============================================================
    GOOGLE CALENDAR (Fase 7) — modulo isolato e opzionale.
@@ -444,6 +456,27 @@ function corrispondeRicerca(testoRicercabile, query) {
   const hay = normalizzaRicerca(testoRicercabile);
   const parole = normalizzaRicerca(query).split(' ').filter(Boolean);
   return parole.length > 0 && parole.every(p => hay.includes(p));
+}
+
+// R9 (chiesto da Denis): un prodotto nuovo creato al volo (da "Scrivi un
+// materiale" o dal preventivo) deve finire da solo nella categoria giusta,
+// non sempre in quella che si stava sfogliando per caso. Indovina dalle
+// parole più tipiche del nome — nessuna IA, solo parole chiave, in ordine
+// dal più specifico al più generico per evitare ambiguità (es. "lampada da
+// bagno" conta come Bagno, controllato prima di Illuminazione/Elettrico).
+function indovinaCategoria(nome, fallback) {
+  const n = normalizzaRicerca(nome);
+  const gruppi = [
+    ['Bagno', ['lavabo', 'sanitari', 'bidet', 'doccia', 'vaso wc', 'miscelatore', 'specchio', 'lavabi', 'piatto doccia']],
+    ['Illuminazione', ['lampadina', 'faretto', 'plafoniera', 'lampada', ' led ', 'spot', 'applique']],
+    ['Riscaldamento e clima', ['caldaia', 'climatizzatore', 'condizionatore', 'pompa di calore', 'scaldabagno', 'radiatore', 'termosifone', 'stufa', 'camino']],
+    ['Elettrico', ['cavo', 'interruttore', 'presa', 'centralino', 'placca', 'magnetotermico', 'differenziale', 'quadro elettrico', 'telecamera', 'videocitofono', 'switch', 'antenna', 'fotocellula', 'cancello', 'modulo', 'sartel', 'gewiss', 'bticino', 'vimar', 'hikvision']],
+    ['Idraulica', ['valvola', 'tubo', 'raccordo', 'rubinetto', 'sifone', 'guarnizione', 'scarico', 'tubazione', 'canotto', 'flessibile']],
+  ];
+  for (const [categoria, parole] of gruppi) {
+    if (parole.some(p => n.includes(p))) return categoria;
+  }
+  return fallback;
 }
 
 // R6 "wow, come le app di tutti i giorni": avatar colorato con iniziali per
@@ -4075,7 +4108,7 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
     setNpvSalvando(true);
     const prezzo = parseFloat((npvPrezzo || '0').replace(',', '.')) || 0;
     const payload = {
-      nome, categoria: activeCat, sottocategoria: 'Generico', tier: 'Standard',
+      nome, categoria: indovinaCategoria(nome, activeCat), sottocategoria: 'Generico', tier: 'Standard',
       prezzo, fornitore: 'Generico', unita: npvUnita, descrizione: npvDescrizione.trim(),
     };
     const { data, error } = await sb.from('prodotti').insert(prodottoToRow(payload)).select().single();
@@ -4119,9 +4152,13 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
   const aggiungiRigaChat = async () => {
     const testo = chatRigaTesto.trim();
     if (!testo || chatSalvando) return;
-    // il prezzo, se scritto, è l'ultimo numero della riga (con o senza
-    // trattino/€ davanti) — tutto il resto prima è il nome
-    const matchPrezzo = testo.match(/[-–—]?\s*(\d+(?:[.,]\d{1,2})?)\s*€?\s*$/);
+    // il prezzo, se scritto, è l'ultimo numero della riga, MA solo se
+    // staccato da uno spazio vero prima (con o senza trattino/€) — senza
+    // questo lo spazio obbligatorio, nomi tecnici che finiscono già con un
+    // numero attaccato (es. "...2x0,50", "...ip65") venivano tagliati per
+    // sbaglio, scambiando parte del nome per un prezzo (bug trovato con un
+    // preventivo reale durante un test)
+    const matchPrezzo = testo.match(/\s[-–—]?\s*(\d+(?:[.,]\d{1,2})?)\s*€?\s*$/);
     let nome = testo;
     let prezzoScritto = null;
     if (matchPrezzo) {
@@ -4139,7 +4176,7 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
     }
     setChatSalvando(true);
     const payload = {
-      nome, categoria: activeCat, sottocategoria: 'Generico', tier: 'Standard',
+      nome, categoria: indovinaCategoria(nome, activeCat), sottocategoria: 'Generico', tier: 'Standard',
       prezzo: prezzoScritto || 0, fornitore: 'Generico', unita: 'pz', descrizione: '',
     };
     const { data, error } = await sb.from('prodotti').insert(prodottoToRow(payload)).select().single();
@@ -7028,6 +7065,10 @@ function App() {
     const intervallo = setInterval(controllaVersione, 10 * 60 * 1000);
     return () => { document.removeEventListener('visibilitychange', onVisibilita); clearInterval(intervallo); };
   }, []);
+
+  // R10: la conferma "app aggiornata" vive dentro ToastHost stesso (vedi
+  // sopra) — evita la corsa fra due componenti che montano nello stesso
+  // istante.
 
   // stato centrale: tutta l'app legge e scrive da qui
   const [clienti, setClienti] = useState([]);
