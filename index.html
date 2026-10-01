@@ -22,22 +22,21 @@
   /* --sab: letta da JS per correggere --app-height in modalità "aggiunta
      alla schermata Home" su iPhone (vedi syncAppHeight più sotto). */
   :root { --sab: env(safe-area-inset-bottom, 0px); }
-  /* --app-height è impostata via JS (visualViewport): è l'unica misura
-     affidabile su iPhone per evitare la striscia bianca sotto menu/barra. */
+  /* --app-height è impostata via JS (visualViewport) come riserva per iPhone
+     che non supportano ancora "interactive-widget=resizes-content" nel meta
+     viewport in testa al file — quello fa il lavoro vero: ridimensiona il
+     layout viewport quando appare la tastiera, così "100dvh" si aggiorna da
+     solo, senza inseguire nulla a mano. */
   html {
-    height: var(--app-height, 100%);
+    height: var(--app-height, 100dvh);
     background: #eef1f5;
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior: none;
   }
   body {
     margin: 0;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
     width: 100%;
-    height: var(--app-height, 100%);
+    height: var(--app-height, 100dvh);
     overflow: hidden;
     overscroll-behavior: none;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
@@ -129,30 +128,27 @@ window.addEventListener('error', function (e) {
   if (b) { b.style.display = 'block'; b.textContent = 'Errore: ' + (e.message || e); }
 });
 (function syncAppHeight() {
-  // --app-height è impostata via JS (visualViewport): è l'unica misura
-  // affidabile su iPhone per evitare la striscia bianca sotto menu/barra.
-  // (Un vecchio tentativo di sommare sempre la safe-area qui è stato
-  // SCARTATO: in Safari "a tab" visualViewport.height include già la
-  // safe-area, quindi sommarla di nuovo spingeva la barra fuori schermo.
-  // Ma in modalità "aggiunta alla schermata Home" su iPhone succede il
-  // contrario — lì visualViewport.height la ESCLUDE, lasciando una
-  // striscia bianca vuota sotto la barra di navigazione — quindi la
-  // sommiamo SOLO quando l'app gira in quella modalità, mai in Safari.)
+  // --app-height è una riserva via JS per iPhone che non supportano ancora
+  // "interactive-widget=resizes-content" (il meta viewport in testa al file
+  // fa già il lavoro vero su quelli che lo supportano).
   var inStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-  // R9/R11/R12: DUE tentativi precedenti qui provavano a "inseguire" lo
-  // spostamento della tastiera spostando il body di proposito (prima con
-  // transform, poi con top) — ENTRAMBI scartati: verificato dal vivo da
-  // Denis che peggioravano le cose (barra in basso che spariva, striscia
-  // grigia in alto permanente). Senza un iPhone vero sotto mano per
-  // calibrare la correzione, continuare a indovinare rischia solo di
-  // rompere altro. Resta SOLO il calcolo dell'altezza (che risolve il
-  // problema originale, la striscia bianca sotto la barra) — niente più
-  // spostamenti manuali del body. Vedi il meta tag "interactive-widget" in
-  // testa al file per il vero tentativo di risolvere il salto, che lascia
-  // fare al browser stesso invece di inseguirlo a mano.
+  // R9/R11/R12/R13: quattro tentativi precedenti provavano a "inseguire" la
+  // tastiera spostando/ridimensionando un body "position:fixed" (prima con
+  // transform — rompeva i modali/overlay fixed nidificati nell'app — poi con
+  // top, calcolato in momenti diversi). Da un video reale si è visto il
+  // meccanismo di fondo: con il body ancorato (fixed) al layout viewport,
+  // quando Safari scorre il "visual viewport" per portare il campo sopra la
+  // tastiera, il body non segue — header che sparisce sopra, barra "appesa"
+  // con un vuoto sotto. Confrontando con un'altra app dove la tastiera non
+  // sposta nulla, la differenza è proprio questa: lì il body NON è
+  // "position:fixed". Qui si toglie lo stesso — un body normale, alto
+  // quanto il viewport, lascia che sia il browser a gestire la tastiera
+  // come fa di natura con qualunque pagina. Niente più spostamenti manuali.
   var set = function () {
-    var h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-    if (inStandalone) {
+    var vv = window.visualViewport;
+    var h = vv ? vv.height : window.innerHeight;
+    var tastieraAperta = !!(vv && (window.innerHeight - vv.height > 100));
+    if (inStandalone && !tastieraAperta) {
       var sab = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sab')) || 0;
       h += sab;
     }
@@ -163,7 +159,6 @@ window.addEventListener('error', function (e) {
   window.addEventListener('orientationchange', set);
   if (window.visualViewport) {
     window.visualViewport.addEventListener('resize', set);
-    window.visualViewport.addEventListener('scroll', set);
   }
 })();
 (function fixTastieraIOS() {
@@ -214,7 +209,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202610011530';
+const APP_VERSION = '202610011645';
 
 // R10 (chiesto da Denis: dopo un push non si vedeva conferma che l'app si
 // fosse aggiornata) — TENTATIVO IN SOSPESO, non ancora funzionante: la
