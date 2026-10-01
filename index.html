@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, interactive-widget=resizes-content">
 <meta name="theme-color" content="#10133a">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Ferari">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
@@ -19,16 +19,15 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   * { box-sizing: border-box; }
-  /* --sab: letta da JS per correggere --app-height in modalità "aggiunta
-     alla schermata Home" su iPhone (vedi syncAppHeight più sotto). */
-  :root { --sab: env(safe-area-inset-bottom, 0px); }
-  /* --app-height è impostata via JS (visualViewport) come riserva per iPhone
-     che non supportano ancora "interactive-widget=resizes-content" nel meta
-     viewport in testa al file — quello fa il lavoro vero: ridimensiona il
-     layout viewport quando appare la tastiera, così "100dvh" si aggiorna da
-     solo, senza inseguire nulla a mano. */
+  /* --nav-h: altezza vera della barra di navigazione mobile (fixed, vedi
+     .app-bottom-nav) — h-14 (56px) più l'eventuale home indicator. Usata
+     anche per lo spazio da lasciare sotto i contenuti (main) e per far
+     fermare la barra "Totale/Anteprima" appena sopra, invece che sotto. */
+  :root { --nav-h: calc(3.5rem + env(safe-area-inset-bottom, 0px)); }
+  /* Altezza: un solo meccanismo, "100dvh" — niente più calcoli via JS su
+     visualViewport (vedi nota più sotto, dove prima c'era syncAppHeight). */
   html {
-    height: var(--app-height, 100dvh);
+    height: 100dvh;
     background: #eef1f5;
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior: none;
@@ -36,7 +35,7 @@
   body {
     margin: 0;
     width: 100%;
-    height: var(--app-height, 100dvh);
+    height: 100dvh;
     overflow: hidden;
     overscroll-behavior: none;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
@@ -58,14 +57,16 @@
     max-height: 100%;
   }
   .app-sidebar {
-    height: var(--app-height, 100%);
+    height: 100dvh;
     top: 0;
     bottom: auto;
   }
-  /* NB: niente padding-bottom con env(safe-area-inset-bottom) qui — Denis lo
-     vuole a filo come sul web, senza striscia bianca vuota sotto le icone.
-     Le icone/etichette sono comunque centrate dentro h-14 (56px), quindi
-     restano ben lontane dal bordo vero anche senza quel margine extra. */
+  /* main sotto la barra: la barra ora è "fixed" (fuori dal flusso flex),
+     quindi main deve lasciarle spazio sotto per non finirci nascosto dietro. */
+  .app-main-pad-bottom { padding-bottom: calc(var(--nav-h) + 1rem); }
+  @media (min-width: 1024px) {
+    .app-main-pad-bottom { padding-bottom: 0; }
+  }
   #errbox { display:none; padding:24px; font-family:monospace; font-size:13px; color:#b91c1c;
             background:#fef2f2; border:1px solid #fecaca; margin:24px; border-radius:8px;
             white-space:pre-wrap; }
@@ -127,53 +128,15 @@ window.addEventListener('error', function (e) {
   var b = document.getElementById('errbox');
   if (b) { b.style.display = 'block'; b.textContent = 'Errore: ' + (e.message || e); }
 });
-(function syncAppHeight() {
-  // --app-height è una riserva via JS per iPhone che non supportano ancora
-  // "interactive-widget=resizes-content" (il meta viewport in testa al file
-  // fa già il lavoro vero su quelli che lo supportano).
-  var inStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-  // R9/R11/R12/R13: quattro tentativi precedenti provavano a "inseguire" la
-  // tastiera spostando/ridimensionando un body "position:fixed" (prima con
-  // transform — rompeva i modali/overlay fixed nidificati nell'app — poi con
-  // top, calcolato in momenti diversi). Da un video reale si è visto il
-  // meccanismo di fondo: con il body ancorato (fixed) al layout viewport,
-  // quando Safari scorre il "visual viewport" per portare il campo sopra la
-  // tastiera, il body non segue — header che sparisce sopra, barra "appesa"
-  // con un vuoto sotto. Confrontando con un'altra app dove la tastiera non
-  // sposta nulla, la differenza è proprio questa: lì il body NON è
-  // "position:fixed". Qui si toglie lo stesso — un body normale, alto
-  // quanto il viewport, lascia che sia il browser a gestire la tastiera
-  // come fa di natura con qualunque pagina. Niente più spostamenti manuali.
-  var set = function () {
-    var vv = window.visualViewport;
-    var h = vv ? vv.height : window.innerHeight;
-    var tastieraAperta = !!(vv && (window.innerHeight - vv.height > 100));
-    if (inStandalone && !tastieraAperta) {
-      var sab = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sab')) || 0;
-      h += sab;
-    }
-    document.documentElement.style.setProperty('--app-height', Math.round(h) + 'px');
-  };
-  set();
-  window.addEventListener('resize', set);
-  window.addEventListener('orientationchange', set);
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', set);
-  }
-})();
-(function fixTastieraIOS() {
-  // Con lo spostamento ora gestito sopra (syncAppHeight), qui basta portare
-  // il campo appena toccato ben visibile sopra la tastiera — una volta sola,
-  // senza più combattere contro lo scroll nativo di WebKit.
-  document.addEventListener('focusin', function (e) {
-    var t = e.target;
-    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) {
-      setTimeout(function () {
-        t.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      }, 50);
-    }
-  });
-})();
+// R9/R11/R12/R13/R14: quattro tentativi precedenti inseguivano la tastiera
+// via JS — un body "position:fixed" ricalcolato a mano (transform, poi top,
+// poi un'altezza da visualViewport), più uno scrollIntoView forzato ad ogni
+// focus. Tre meccanismi che si contendevano la stessa cosa, con risultati
+// diversi ma sempre rotti. Confrontato con un'altra app dove la tastiera non
+// sposta mai nulla: lì non c'è NESSUNO di questi tre. Qui si fa lo stesso —
+// un solo meccanismo (il meta "interactive-widget=resizes-content" in testa
+// al file, più "100dvh" nel CSS), zero JS che insegue la tastiera o il
+// focus. Il browser sa già come si fa.
 (function rippleAndroid() {
   // effetto ripple Material su qualunque elemento con classe "app-ripple" —
   // un listener solo, delegato su document, così funziona anche sui bottoni
@@ -209,7 +172,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202610011645';
+const APP_VERSION = '202610011730';
 
 // R10 (chiesto da Denis: dopo un push non si vedeva conferma che l'app si
 // fosse aggiornata) — TENTATIVO IN SOSPESO, non ancora funzionante: la
@@ -2136,7 +2099,10 @@ function MobileBottomNav({ currentPage, setCurrentPage }) {
   ];
 
   return (
-    <nav className="app-bottom-nav shrink-0 lg:hidden bg-white border-t border-slate-200 pb-1.5">
+    <nav
+      className="app-bottom-nav lg:hidden fixed inset-x-0 bottom-0 z-40 bg-white border-t border-slate-200"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+    >
       <div className="grid grid-cols-4 h-14">
         {items.map(function (item) {
           const Icon = item.icon;
@@ -6006,7 +5972,7 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
           Solo su telefono: su desktop il riepilogo è già sempre visibile
           nella colonna laterale. */}
       {cliente && !showPreview && !riordinaAperto && (
-        <div className="sticky bottom-0 z-30 -mx-4 sm:-mx-6 lg:hidden">
+        <div className="sticky z-30 -mx-4 sm:-mx-6 lg:hidden" style={{ bottom: 'var(--nav-h)' }}>
           <div className="bg-white/95 backdrop-blur border-t border-slate-200 px-4 py-3 flex items-center justify-between gap-3 shadow-[0_-6px_16px_rgba(15,23,42,0.08)]">
             <div>
               <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Totale</p>
@@ -7312,7 +7278,7 @@ function App() {
           </div>
         )}
 
-        <main className="flex-1 min-h-0 overflow-y-auto app-scroll pb-4 lg:pb-0">
+        <main className="flex-1 min-h-0 overflow-y-auto app-scroll app-main-pad-bottom">
           <div key={currentPage} className="app-page">
         {currentPage === 'dashboard' && (
           <DashboardPage preventivi={preventivi} clienti={clienti} onVediTutti={() => setCurrentPage('preventivi')} />
