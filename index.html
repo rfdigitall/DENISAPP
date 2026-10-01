@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, interactive-widget=resizes-content">
-<meta name="theme-color" content="#10133a" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#10133a">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<!-- black-translucent: header scuro continua sotto la status bar = zero "pata" bianca -->
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- black = status bar opaca nera (niente pata bianca). Il webview inizia SOTTO.
+     NON usare safe-area-top sul TopBar con questo stile. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Ferari">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
@@ -21,8 +21,6 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   * { box-sizing: border-box; }
-  /* Clone RF Digital: --nav-content-h = solo icone (72px). Safe-area
-     si aggiunge UNA volta: nel padding della nav + nel padding del main. */
   :root {
     --nav-content-h: 4.5rem;
     --nav-h: calc(var(--nav-content-h) + env(safe-area-inset-bottom, 0px));
@@ -33,7 +31,7 @@
   html {
     height: 100%;
     height: 100dvh;
-    background: var(--ferari-bg);
+    background: var(--ferari-navy);
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior: none;
   }
@@ -68,47 +66,38 @@
     top: 0;
     bottom: auto;
   }
-  .app-main-pad-bottom { padding-bottom: calc(var(--nav-h) + 1rem); }
-  .app-main-pad-composer { padding-bottom: calc(var(--composer-h) + 1rem); }
-  .app-main-pad-flat { padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); }
+  .app-main-pad-bottom { padding-bottom: calc(var(--nav-h) + 0.75rem); }
+  .app-main-pad-composer { padding-bottom: calc(var(--composer-h) + 0.75rem); }
+  .app-main-pad-flat { padding-bottom: 0.75rem; }
   @media (min-width: 1024px) {
     .app-main-pad-bottom,
     .app-main-pad-composer,
     .app-main-pad-flat { padding-bottom: 0; }
   }
-  /* Barra basso: BIANCO SOLIDO (non rgba) → safe-area bianca, lipita al telefono come RF */
-  .app-bottom-nav {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 40;
-    margin: 0;
-    padding: 0;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    background: #ffffff;
-    border-top: 1px solid rgba(0, 0, 0, 0.06);
-    /* evita scivolamenti iOS / layer compositing */
-    transform: translate3d(0, 0, 0);
-    -webkit-backface-visibility: hidden;
-  }
+  /* Nav e composer: SOLO come figli diretti del body/shell (mai dentro main scroll).
+     Su iOS, position:fixed DENTRO -webkit-overflow-scrolling si spezza → barra sospesa. */
+  .app-bottom-nav,
   .app-composer-footer {
     position: fixed;
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 40;
+    z-index: 50;
     margin: 0;
     padding: 0;
     padding-bottom: env(safe-area-inset-bottom, 0px);
     background: #ffffff;
     border-top: 1px solid rgba(0, 0, 0, 0.06);
-    transform: translate3d(0, 0, 0);
   }
-  /* Header: navy continua sotto la status bar (black-translucent) */
+  @media (min-width: 1024px) {
+    .app-bottom-nav,
+    .app-composer-footer { display: none !important; }
+  }
+  /* TopBar: con status "black" il webview inizia già sotto la status bar —
+     ZERO padding safe-area-top (altrimenti pata / doppio spazio). */
   .app-topbar-mobile {
     background: var(--ferari-navy);
-    padding-top: env(safe-area-inset-top, 0px);
+    padding-top: 0;
   }
   #errbox { display:none; padding:24px; font-family:monospace; font-size:13px; color:#b91c1c;
             background:#fef2f2; border:1px solid #fecaca; margin:24px; border-radius:8px;
@@ -215,7 +204,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202610010700';
+const APP_VERSION = '202610010715';
 
 // R10 (chiesto da Denis: dopo un push non si vedeva conferma che l'app si
 // fosse aggiornata) — TENTATIVO IN SOSPESO, non ancora funzionante: la
@@ -2141,8 +2130,8 @@ function MobileBottomNav({ currentPage, setCurrentPage }) {
     { id: 'catalogo', label: 'Catalogo', icon: ShoppingBag },
   ];
 
-  return (
-    <nav className="app-bottom-nav lg:hidden">
+  return ReactDOM.createPortal(
+    <nav className="app-bottom-nav">
       <div className="mx-auto flex max-w-lg items-stretch justify-around px-1" style={{ height: 'var(--nav-content-h)' }}>
         {items.map(function (item) {
           const Icon = item.icon;
@@ -2162,7 +2151,8 @@ function MobileBottomNav({ currentPage, setCurrentPage }) {
           );
         })}
       </div>
-    </nav>
+    </nav>,
+    document.body
   );
 }
 
@@ -3948,14 +3938,20 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
       setRincaroOre(duplicaPendente.rincaroOre);
       setRincaroTariffa(duplicaPendente.rincaroTariffa);
       setDuplicaPendente(null);
+      setModoRapido(true);
+      setRapidoExtra(null);
       return;
     }
     const bozza = leggiBozzaCliente(c.id);
     if (bozza) {
       ripristinaBozza(bozza);
+      setModoRapido(true);
+      setRapidoExtra(null);
       return;
     }
     setClienteId(c.id);
+    setModoRapido(true);
+    setRapidoExtra(null);
   };
 
   // avvia una nuova bozza vuota ma con dentro le voci di un preventivo già
@@ -6230,16 +6226,17 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
         />
       )}
 
-      {/* Footer fisso Totale/Anteprima — sostituisce la bottom nav in modalità nuovo.
-          Un solo livello in fondo (niente sticky sopra la nav = niente "buco"). */}
-      {cliente && !showPreview && !riordinaAperto && (
-        <div className="app-composer-footer lg:hidden">
+      {/* Footer Totale: PORTAL su document.body — MAI dentro main.app-scroll.
+          Su iOS fixed dentro overflow-scroll = barra sospesa col buco grigio. */}
+      {cliente && !showPreview && !riordinaAperto && ReactDOM.createPortal(
+        <div className="app-composer-footer">
           <div className="px-4 py-3 flex items-center justify-between gap-3" style={{ minHeight: '4.75rem' }}>
             <div className="min-w-0">
               <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Totale</p>
               <p className="text-xl font-bold text-slate-900 tracking-tight">{fmtEuro(Math.round(totale))}</p>
             </div>
             <button
+              type="button"
               onClick={() => setShowPreview(true)}
               disabled={carrello.length === 0}
               className="app-ripple shrink-0 bg-[#10133a] hover:bg-[#1a1f4d] disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-semibold px-6 py-3.5 rounded-2xl transition-colors flex items-center gap-2"
@@ -6248,7 +6245,8 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
               Anteprima
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* success modal */}
