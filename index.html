@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, interactive-widget=resizes-content">
 <meta name="theme-color" content="#10133a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -139,17 +139,17 @@ window.addEventListener('error', function (e) {
   // striscia bianca vuota sotto la barra di navigazione — quindi la
   // sommiamo SOLO quando l'app gira in quella modalità, mai in Safari.)
   var inStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-  // R9/R11: un tentativo precedente qui usava "transform" sul body per
-  // seguire lo spostamento della tastiera — SBAGLIATO, e per il motivo
-  // esatto già scritto più sotto su questo stesso file (un transform crea
-  // un nuovo containing block e stacca TUTTI gli elementi position:fixed
-  // annidati, che si ancorano al body invece che allo schermo). Infatti ha
-  // causato danni reali visti da Denis dal vivo: la barra di navigazione in
-  // basso spariva/si spostava, e appariva uno spazio vuoto in alto a
-  // intermittenza. Tolto del tutto. Spostare "top" invece di usare
-  // "transform" ottiene lo stesso risultato (seguire lo spostamento della
-  // tastiera) SENZA creare un containing block nuovo — su un elemento già
-  // position:fixed, cambiare top/left/right non ha questo effetto.
+  // R9/R11/R12: DUE tentativi precedenti qui provavano a "inseguire" lo
+  // spostamento della tastiera spostando il body di proposito (prima con
+  // transform, poi con top) — ENTRAMBI scartati: verificato dal vivo da
+  // Denis che peggioravano le cose (barra in basso che spariva, striscia
+  // grigia in alto permanente). Senza un iPhone vero sotto mano per
+  // calibrare la correzione, continuare a indovinare rischia solo di
+  // rompere altro. Resta SOLO il calcolo dell'altezza (che risolve il
+  // problema originale, la striscia bianca sotto la barra) — niente più
+  // spostamenti manuali del body. Vedi il meta tag "interactive-widget" in
+  // testa al file per il vero tentativo di risolvere il salto, che lascia
+  // fare al browser stesso invece di inseguirlo a mano.
   var set = function () {
     var h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
     if (inStandalone) {
@@ -157,8 +157,6 @@ window.addEventListener('error', function (e) {
       h += sab;
     }
     document.documentElement.style.setProperty('--app-height', Math.round(h) + 'px');
-    var offset = window.visualViewport ? window.visualViewport.offsetTop : 0;
-    document.body.style.top = offset ? Math.round(offset) + 'px' : '';
   };
   set();
   window.addEventListener('resize', set);
@@ -216,7 +214,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202610010900';
+const APP_VERSION = '202610011530';
 
 // R10 (chiesto da Denis: dopo un push non si vedeva conferma che l'app si
 // fosse aggiornata) — TENTATIVO IN SOSPESO, non ancora funzionante: la
@@ -1084,7 +1082,7 @@ async function iniettaIconaApp() {
     short_name: 'Ferari',
     start_url: '.',
     display: 'standalone',
-    background_color: '#eef1f5',
+    background_color: '#10133a',
     theme_color: '#10133a',
     icons: [
       { src: icona192, sizes: '192x192', type: 'image/png', purpose: 'any' },
