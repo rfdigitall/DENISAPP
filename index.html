@@ -5,9 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, interactive-widget=resizes-content">
 <meta name="theme-color" content="#10133a">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<!-- black-translucent: il navy del TopBar continua dietro la status bar (icone chiare).
-     Richiede PWA da Home Screen. In Safari tab la status resta sempre chiara = normale. -->
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- "black" (non translucent): la status bar è una barra nera opaca, fuori dal
+     flusso di disegno della pagina — niente ricomposizione da rifare ogni
+     volta che l'app torna in primo piano. "black-translucent" lasciava
+     intravedere per un istante un grigio di transizione proprio lì, segnalato
+     da Denis anche alla semplice riapertura dell'app (non solo dopo un po'):
+     scambio deliberato, un filo di navy sotto la status bar in meno ma zero
+     rischio di quel lampo grigio. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Ferari">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
@@ -170,7 +175,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202610012105';
+const APP_VERSION = '202610012155';
 
 // R10 (chiesto da Denis: dopo un push non si vedeva conferma che l'app si
 // fosse aggiornata) — TENTATIVO IN SOSPESO, non ancora funzionante: la
@@ -2167,7 +2172,6 @@ function PreventivoMobileList({ items, onSelect, messaggioVuoto }) {
 function StatCard({ label, value, delta, icon: Icon, accent }) {
   return (
     <div className="app-card p-4 lg:p-5 relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-20 h-20 rounded-full opacity-[0.07] -mr-6 -mt-6" style={{ background: '#10133a' }} />
       <div className="flex items-start justify-between relative">
         <div className="min-w-0">
           <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
