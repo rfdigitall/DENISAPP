@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, interactive-widget=resizes-content">
-<meta name="theme-color" content="#0c0f2e">
+<meta name="theme-color" content="#10133a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <!-- black-translucent: il navy del TopBar continua dietro la status bar (icone chiare).
      Richiede PWA da Home Screen. In Safari tab la status resta sempre chiara = normale. -->
@@ -19,26 +19,14 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://cdn.tailwindcss.com"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; }
   :root {
     --nav-content-h: 4.5rem;
     --nav-h: calc(var(--nav-content-h) + env(safe-area-inset-bottom, 0px));
     --composer-h: calc(4.75rem + env(safe-area-inset-bottom, 0px));
-    --ferari-navy: #0c0f2e;
-    --ferari-navy-mid: #161b45;
-    --ferari-gold: #b8956c;
-    --ferari-gold-soft: rgba(184, 149, 108, 0.14);
-    --ferari-bg: #f3f4f8;
-    --ferari-surface: #ffffff;
-    --ferari-ink: #0f1228;
-    --ferari-muted: #6b7289;
-    --ferari-line: rgba(16, 19, 58, 0.08);
-    --ferari-shadow: 0 1px 2px rgba(12, 15, 46, 0.04), 0 8px 24px rgba(12, 15, 46, 0.06);
-    --ferari-radius: 1.25rem;
+    --ferari-navy: #10133a;
+    --ferari-bg: #eef1f5;
   }
   html {
     height: 100%;
@@ -54,11 +42,9 @@
     height: 100dvh;
     overflow: hidden;
     overscroll-behavior: none;
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
     background: var(--ferari-bg);
-    color: var(--ferari-ink);
     -webkit-font-smoothing: antialiased;
-    letter-spacing: -0.011em;
   }
   #root {
     height: 100%;
@@ -66,9 +52,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    background:
-      radial-gradient(ellipse 120% 60% at 50% -10%, rgba(184, 149, 108, 0.07), transparent 55%),
-      var(--ferari-bg);
+    background: var(--ferari-bg);
   }
   .h-app-viewport {
     height: 100%;
@@ -77,11 +61,7 @@
     min-height: 0;
     max-height: 100%;
   }
-  .app-sidebar {
-    height: 100dvh;
-    top: 0;
-    bottom: auto;
-  }
+  .app-sidebar { height: 100dvh; top: 0; bottom: auto; }
   .app-main-pad-bottom { padding-bottom: calc(var(--nav-h) + 0.75rem); }
   .app-main-pad-composer { padding-bottom: calc(var(--composer-h) + 0.75rem); }
   .app-main-pad-flat { padding-bottom: 0.75rem; }
@@ -93,104 +73,47 @@
   .app-bottom-nav,
   .app-composer-footer {
     position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    left: 0; right: 0; bottom: 0;
     z-index: 50;
-    margin: 0;
-    padding: 0;
+    margin: 0; padding: 0;
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    background: rgba(255, 255, 255, 0.92);
-    -webkit-backdrop-filter: saturate(180%) blur(20px);
-    backdrop-filter: saturate(180%) blur(20px);
-    border-top: 1px solid var(--ferari-line);
-    box-shadow: 0 -8px 32px rgba(12, 15, 46, 0.04);
+    background: #ffffff;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
   }
   @media (min-width: 1024px) {
     .app-bottom-nav,
     .app-composer-footer { display: none !important; }
   }
   .app-topbar-mobile {
-    background:
-      linear-gradient(165deg, var(--ferari-navy-mid) 0%, var(--ferari-navy) 55%, #090b22 100%);
+    background: var(--ferari-navy);
     padding-top: env(safe-area-inset-top, 0px);
-    position: relative;
-  }
-  .app-topbar-mobile::after {
-    content: '';
-    position: absolute;
-    left: 1.25rem;
-    right: 1.25rem;
-    bottom: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(184, 149, 108, 0.45), transparent);
   }
   #errbox { display:none; padding:24px; font-family:monospace; font-size:13px; color:#b91c1c;
             background:#fef2f2; border:1px solid #fecaca; margin:24px; border-radius:8px;
             white-space:pre-wrap; }
   .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .app-scroll { -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
-  /* NB: niente transform sull'animazione pagina — rompe fixed nested */
-  .app-page { animation: appEnter 0.28s cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .app-page { animation: appEnter 0.24s ease-out both; }
   @keyframes appEnter {
     from { opacity: 0; }
     to { opacity: 1; }
   }
   .app-card {
-    background: var(--ferari-surface);
-    border-radius: var(--ferari-radius);
-    border: 1px solid var(--ferari-line);
-    box-shadow: var(--ferari-shadow);
+    background: #fff;
+    border-radius: 1rem;
+    box-shadow: 0 1px 2px rgba(16, 19, 58, 0.04), 0 4px 16px rgba(16, 19, 58, 0.06);
   }
-  .lux-panel {
-    background: var(--ferari-surface);
-    border-radius: 1.35rem;
-    border: 1px solid var(--ferari-line);
-    box-shadow: var(--ferari-shadow);
-    overflow: hidden;
+  @media (min-width: 1024px) {
+    .app-card { border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
   }
-  .lux-label {
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--ferari-muted);
-  }
-  .lux-btn-primary {
-    background: linear-gradient(165deg, var(--ferari-navy-mid), var(--ferari-navy));
-    color: #fff;
-    border: none;
-    box-shadow: 0 4px 14px rgba(12, 15, 46, 0.28);
-  }
-  .lux-btn-primary:active { transform: scale(0.98); }
-  .lux-chip {
-    background: var(--ferari-gold-soft);
-    color: #8a6a3e;
-    border: 1px solid rgba(184, 149, 108, 0.25);
-  }
-  .lux-gold-line {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(184, 149, 108, 0.5), transparent);
-  }
-  .app-input {
-    font-size: 16px;
-  }
-  input, select, textarea {
-    font-size: 16px !important;
-  }
+  .app-input { font-size: 16px; }
+  input, select, textarea { font-size: 16px !important; }
   .app-ripple { position: relative; overflow: hidden; }
   .app-ripple-circle {
-    position: absolute;
-    border-radius: 50%;
-    background: currentColor;
-    opacity: 0.25;
-    transform: scale(0);
-    animation: appRippleAnim 480ms ease-out;
-    pointer-events: none;
+    position: absolute; border-radius: 50%; background: currentColor; opacity: 0.25;
+    transform: scale(0); animation: appRippleAnim 480ms ease-out; pointer-events: none;
   }
-  @keyframes appRippleAnim {
-    to { transform: scale(1); opacity: 0; }
-  }
+  @keyframes appRippleAnim { to { transform: scale(1); opacity: 0; } }
 </style>
 </head>
 <body>
@@ -247,7 +170,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202610011930';
+const APP_VERSION = '202610012105';
 
 // R10 (chiesto da Denis: dopo un push non si vedeva conferma che l'app si
 // fosse aggiornata) — TENTATIVO IN SOSPESO, non ancora funzionante: la
@@ -2126,21 +2049,18 @@ function TopBar({ title, subtitle, onMenuClick }) {
   return (
     <>
       <header className="app-topbar-mobile lg:hidden text-white shrink-0">
-        <div className="px-5 pt-3 pb-2 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <img src={LOGO_BASE64} alt="" className="w-9 h-9 rounded-xl shrink-0 ring-1 ring-white/15 shadow-lg shadow-black/20" />
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[color:var(--ferari-gold)] truncate">Ferari Impianti</p>
-              <p className="text-[11px] text-white/45 truncate leading-tight">Preventivi professionali</p>
-            </div>
+        <div className="px-4 pt-2.5 pb-2 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <img src={LOGO_BASE64} alt="" className="w-8 h-8 rounded-lg shrink-0 ring-1 ring-white/10" />
+            <span className="text-sm font-semibold text-white/90 truncate">Ferari Impianti</span>
           </div>
-          <button type="button" onClick={onMenuClick} className="w-10 h-10 rounded-full bg-white/8 active:bg-white/15 ring-1 ring-white/10 flex items-center justify-center shrink-0" aria-label="Menu">
+          <button type="button" onClick={onMenuClick} className="w-10 h-10 rounded-full bg-white/10 active:bg-white/20 flex items-center justify-center shrink-0" aria-label="Menu">
             <Menu className="w-5 h-5 text-white" />
           </button>
         </div>
-        <div className="px-5 pb-4 pt-1">
-          <h1 className="text-[1.75rem] font-extrabold tracking-[-0.03em] leading-none">{title}</h1>
-          {subtitle && <p className="text-sm text-white/55 mt-1.5 font-medium">{subtitle}</p>}
+        <div className="px-4 pb-3">
+          <h1 className="text-[1.55rem] font-bold tracking-tight leading-tight">{title}</h1>
+          {subtitle && <p className="text-sm text-white/65 mt-0.5">{subtitle}</p>}
         </div>
       </header>
 
@@ -2187,9 +2107,9 @@ function MobileBottomNav({ currentPage, setCurrentPage }) {
               key={item.id}
               type="button"
               onClick={() => setCurrentPage(item.id)}
-              className={`app-ripple flex flex-1 flex-col items-center justify-center gap-0.5 px-1 transition-colors active:scale-95 ${isActive ? 'text-[color:var(--ferari-navy)]' : 'text-slate-400'}`}
+              className={`app-ripple flex flex-1 flex-col items-center justify-center gap-0.5 px-1 transition-colors active:scale-95 ${isActive ? 'text-blue-700' : 'text-slate-400'}`}
             >
-              <span className={`flex h-8 w-8 items-center justify-center rounded-[12px] transition-all ${isActive ? 'bg-[color:var(--ferari-gold-soft)] ring-1 ring-[rgba(184,149,108,0.2)]' : ''}`}>
+              <span className={`flex h-8 w-8 items-center justify-center rounded-[12px] transition-all ${isActive ? 'bg-blue-100' : ''}`}>
                 <Icon className="w-5 h-5" strokeWidth={isActive ? 2.35 : 1.75} />
               </span>
               <span className={`text-[10px] leading-none tracking-tight ${isActive ? 'font-bold' : 'font-medium'}`}>{item.label}</span>
@@ -2247,11 +2167,11 @@ function PreventivoMobileList({ items, onSelect, messaggioVuoto }) {
 function StatCard({ label, value, delta, icon: Icon, accent }) {
   return (
     <div className="app-card p-4 lg:p-5 relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-20 h-20 rounded-full opacity-[0.07] -mr-6 -mt-6" style={{ background: 'var(--ferari-gold)' }} />
+      <div className="absolute top-0 right-0 w-20 h-20 rounded-full opacity-[0.07] -mr-6 -mt-6" style={{ background: '#10133a' }} />
       <div className="flex items-start justify-between relative">
         <div className="min-w-0">
-          <p className="lux-label">{label}</p>
-          <p className="text-[1.65rem] lg:text-3xl font-extrabold text-[color:var(--ferari-ink)] mt-2 tracking-[-0.03em] truncate">{value}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
+          <p className="text-[1.65rem] lg:text-3xl font-extrabold text-slate-900 mt-2 tracking-[-0.03em] truncate">{value}</p>
         </div>
         <div className={`w-10 h-10 lg:w-11 lg:h-11 rounded-2xl flex items-center justify-center shrink-0 ${accent}`}>
           <Icon className="w-5 h-5" />
@@ -3760,9 +3680,10 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
   const [chatRigaTesto, setChatRigaTesto] = useState('');
   const [chatUltimaAzione, setChatUltimaAzione] = useState(null); // { tipo: 'trovato'|'creato', nome, prezzo }
   const [chatSalvando, setChatSalvando] = useState(false);
-  // Modo Rapido (default): chat + preferiti + carrello. Modalità completa resta un tocco via.
-  const [modoRapido, setModoRapido] = useState(true);
-  const [rapidoExtra, setRapidoExtra] = useState(null); // null | 'zona' | 'foto' | 'lavori' | 'manodopera' | 'catalogo'
+  // Due modalità: Completa (default, come Denis la conosce) + Ultra (moderna/rapida).
+  // Niente cancellazione dati: solo UI diversa sullo stesso carrello/salvataggio.
+  const [modoRapido, setModoRapido] = useState(false); // false = Completa, true = Ultra
+  const [rapidoExtra, setRapidoExtra] = useState(null); // null | 'zona' | 'foto' | 'lavori' | 'catalogo' | 'manodopera'
   const [savedFlashId, setSavedFlashId] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
   const [riordinaAperto, setRiordinaAperto] = useState(null); // null | 'materiale' | 'lavori' | 'riepilogo'
@@ -3808,6 +3729,8 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
     setDiciture(bozza.diciture || {});
     setFotoCantiere(bozza.fotoCantiere || []);
     setClienteSearch('');
+    setModoRapido(false);
+    setRapidoExtra(null);
     setMode('nuovo');
     mostraToast('Bozza ripristinata: hai continuato da dove avevi lasciato.', 'info');
   };
@@ -3836,6 +3759,8 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
       } else {
         setClienteId(presetClienteId);
         setCarrello([]);
+        setModoRapido(false);
+        setRapidoExtra(null);
         setMode('nuovo');
       }
       onConsumePreset();
@@ -3985,19 +3910,19 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
       setRincaroOre(duplicaPendente.rincaroOre);
       setRincaroTariffa(duplicaPendente.rincaroTariffa);
       setDuplicaPendente(null);
-      setModoRapido(true);
+      setModoRapido(false);
       setRapidoExtra(null);
       return;
     }
     const bozza = leggiBozzaCliente(c.id);
     if (bozza) {
       ripristinaBozza(bozza);
-      setModoRapido(true);
+      setModoRapido(false);
       setRapidoExtra(null);
       return;
     }
     setClienteId(c.id);
-    setModoRapido(true);
+    setModoRapido(false);
     setRapidoExtra(null);
   };
 
@@ -4037,7 +3962,7 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
     setFotoCantiere([]);
     setClienteSearch('');
     setDiciture({});
-    setModoRapido(true);
+    setModoRapido(false);
     setRapidoExtra(null);
     setMode('nuovo');
   };
@@ -4070,6 +3995,8 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
     setZonaAttiva((p.zone && p.zone[0]) || 'generico');
     setFotoCantiere([]);
     setDiciture(p.diciture || {});
+    setModoRapido(false);
+    setRapidoExtra(null);
     setMode('nuovo');
     if (p.dbId) {
       const { data, error } = await sb.from('foto').select('*').eq('preventivo_id', p.dbId).order('creato_il', { ascending: true });
@@ -4272,8 +4199,15 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
 
   const applicaCarrelloDaPreventivo = (p) => {
     if (!p) return;
+    const n = (p.carrelloSnapshot || []).length;
+    if (carrello.length > 0) {
+      const ok = window.confirm(
+        `Sostituire le voci attuali con la copia di ${p.id} (${n} voci)?\nIl preventivo originale NON viene cancellato.`
+      );
+      if (!ok) return;
+    }
     setCarrello((p.carrelloSnapshot || []).map(item => ({ ...item })));
-    setChatUltimaAzione({ tipo: 'trovato', nome: `Copia da ${p.id}`, prezzo: p.importo || 0 });
+    setChatUltimaAzione({ tipo: 'trovato', nome: `Copia materiali da ${p.id}`, prezzo: p.importo || 0 });
   };
 
   // P3: quantità multiple per i prodotti già nel carrello
@@ -5096,31 +5030,48 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
           />
         </div>
       ) : modoRapido ? (
-        <div className="space-y-3.5 pb-2">
-          <div className="lux-panel px-4 py-3.5 flex items-center gap-3">
-            <button type="button" onClick={() => { setClienteId(null); setRapidoExtra(null); }} className="app-ripple w-10 h-10 rounded-full bg-[color:var(--ferari-bg)] border border-[color:var(--ferari-line)] flex items-center justify-center text-[color:var(--ferari-ink)] shrink-0" aria-label="Indietro">
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-            <div className="min-w-0 flex-1">
-              <p className="lux-label mb-0.5">Preventivo per</p>
-              <p className="text-[15px] font-bold text-[color:var(--ferari-ink)] truncate leading-tight">{cliente.nome}</p>
-              <p className="text-[11px] text-[color:var(--ferari-muted)] truncate">{cliente.indirizzo}</p>
+        <div className="space-y-3 pb-2">
+          {/* ULTRA header + switch Completa|Ultra */}
+          <div className="rounded-2xl bg-[#10133a] text-white px-3.5 py-3.5 shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <button type="button" onClick={() => { setClienteId(null); setRapidoExtra(null); }} className="app-ripple w-9 h-9 rounded-full bg-white/10 flex items-center justify-center shrink-0" aria-label="Indietro">
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-white/50">Ultra · {cliente.nome}</p>
+                <p className="text-[13px] font-semibold truncate text-white/80">{cliente.indirizzo}</p>
+              </div>
+              <div className="shrink-0 inline-flex rounded-full bg-white/10 p-0.5 text-[11px] font-bold">
+                <button type="button" onClick={() => { setModoRapido(false); setRapidoExtra(null); }} className="app-ripple px-2.5 py-1.5 rounded-full text-white/70">Completa</button>
+                <button type="button" className="px-2.5 py-1.5 rounded-full bg-white text-[#10133a]">Ultra</button>
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {[
+                { ok: carrello.filter(i => i.kind !== 'trasferta').length > 0, label: `${carrello.filter(i => i.kind !== 'trasferta').length} voci` },
+                { ok: fotoCantiere.length >= 2, label: `${fotoCantiere.length}/2 foto` },
+                { ok: !!String(kmTrasferta || '').trim(), label: kmTrasferta ? `${kmTrasferta} km` : 'Km' },
+              ].map((s, i) => (
+                <div key={i} className={`rounded-xl px-2 py-1.5 text-center text-[11px] font-bold ${s.ok ? 'bg-emerald-500/20 text-emerald-200' : 'bg-white/10 text-white/55'}`}>
+                  {s.label}
+                </div>
+              ))}
             </div>
           </div>
 
           {preventivi.filter(p => (p.carrelloSnapshot || []).length > 0).slice(0, 6).length > 0 && (
             <div>
-              <p className="lux-label mb-2 px-0.5">Parti da un preventivo</p>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2 px-0.5">Copia materiali (non cancella nulla)</p>
               <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
                 {preventivi.filter(p => (p.carrelloSnapshot || []).length > 0).slice(0, 6).map(p => (
                   <button
                     key={p.id}
                     type="button"
                     onClick={() => applicaCarrelloDaPreventivo(p)}
-                    className="app-ripple shrink-0 px-3.5 py-2.5 rounded-2xl bg-white border border-[color:var(--ferari-line)] text-left shadow-sm active:scale-[0.98]"
+                    className="app-ripple shrink-0 px-3.5 py-2.5 rounded-2xl bg-white border border-slate-200/80 text-left shadow-sm active:scale-[0.98]"
                   >
-                    <p className="text-xs font-bold text-[color:var(--ferari-ink)] truncate max-w-[140px]">{p.cliente || 'Preventivo'}</p>
-                    <p className="text-[10px] text-[color:var(--ferari-muted)] mt-0.5">{(p.carrelloSnapshot || []).length} voci · {fmtEuro(p.importo)}</p>
+                    <p className="text-xs font-bold text-slate-900 truncate max-w-[140px]">{p.cliente || 'Preventivo'}</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{(p.carrelloSnapshot || []).length} voci · {fmtEuro(p.importo)}</p>
                   </button>
                 ))}
               </div>
@@ -5134,18 +5085,20 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
                   key={t.id}
                   type="button"
                   onClick={() => { setZonaAttiva(t.zona); applicaTemplate(t); }}
-                  className="app-ripple shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[11px] font-bold lux-btn-primary"
+                  className="app-ripple shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-[11px] font-bold bg-[#10133a] text-white"
                 >
-                  <Zap className="w-3 h-3 text-[color:var(--ferari-gold)]" /> {t.nome}
+                  <Zap className="w-3 h-3 text-white/80" /> {t.nome}
                 </button>
               ))}
             </div>
           )}
 
-          <div className="lux-panel">
-            <div className="px-4 pt-4 pb-2">
-              <p className="text-[13px] font-bold text-[color:var(--ferari-ink)]">Materiali</p>
-              <p className="text-[11px] text-[color:var(--ferari-muted)] mt-0.5">Scrivi una riga, oppure incolla tutta la lista.</p>
+          <div className="app-card overflow-hidden">
+            <div className="px-4 pt-3.5 pb-2 flex items-end justify-between gap-2">
+              <div>
+                <p className="text-[13px] font-bold text-slate-900">Aggiungi materiali</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">1 riga = 1 voce · oppure incolla tutta la lista</p>
+              </div>
             </div>
             <div className="px-4 pb-3">
               <textarea
@@ -5160,19 +5113,17 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
                 placeholder={"Valvola 1/2 - 18\nTubo rame 16 - 4,50\n..."}
                 disabled={chatSalvando}
                 rows={3}
-                className="w-full px-3.5 py-3 text-[15px] leading-relaxed bg-[color:var(--ferari-bg)] border border-[color:var(--ferari-line)] rounded-2xl outline-none focus:ring-2 focus:ring-[rgba(184,149,108,0.35)] focus:border-[color:var(--ferari-gold)] resize-none disabled:opacity-60"
+                className="w-full px-3.5 py-3 text-[15px] leading-relaxed bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 resize-none disabled:opacity-60"
               />
-              <div className="flex items-center gap-2 mt-2.5">
-                <button
-                  type="button"
-                  onClick={aggiungiRigaChat}
-                  disabled={!chatRigaTesto.trim() || chatSalvando}
-                  className="app-ripple lux-btn-primary flex-1 h-12 rounded-2xl disabled:opacity-40 disabled:shadow-none text-sm font-bold flex items-center justify-center gap-2 transition-all"
-                >
-                  <Plus className="w-5 h-5" />
-                  {chatSalvando ? 'Aggiungo…' : 'Aggiungi'}
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={aggiungiRigaChat}
+                disabled={!chatRigaTesto.trim() || chatSalvando}
+                className="app-ripple mt-2.5 bg-[#10133a] text-white w-full h-12 rounded-2xl disabled:opacity-40 text-sm font-bold flex items-center justify-center gap-2"
+              >
+                <Plus className="w-5 h-5" />
+                {chatSalvando ? 'Aggiungo…' : 'Aggiungi'}
+              </button>
               {chatUltimaAzione && (
                 <p className={`text-xs font-semibold mt-2 ${chatUltimaAzione.tipo === 'trovato' ? 'text-emerald-600' : 'text-blue-600'}`}>
                   ✓ {chatUltimaAzione.nome}{chatUltimaAzione.prezzo ? ` · ${chatUltimaAzione.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €` : ''}
@@ -5180,7 +5131,8 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
               )}
             </div>
             {prodottiPiuUsati.length > 0 && (
-              <div className="px-4 pb-4 border-t border-slate-100 pt-3">
+              <div className="px-4 pb-3.5 border-t border-slate-100 pt-3">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-2">Più usati</p>
                 <div className="flex gap-2 overflow-x-auto -mx-1 px-1">
                   {prodottiPiuUsati.map(p => {
                     const isAdded = !!carrello.find(i => i.id === p.id);
@@ -5201,9 +5153,9 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
             )}
           </div>
 
-          <div className="lux-panel px-4 py-3.5 flex items-center gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="lux-label mb-1">Km A/R</p>
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="app-card px-3.5 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Km A/R</p>
               <div className="flex items-center gap-1.5">
                 <input
                   type="text"
@@ -5211,48 +5163,46 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
                   value={kmTrasferta}
                   onChange={(e) => setKmTrasferta(e.target.value)}
                   placeholder="0"
-                  className="w-full max-w-[72px] text-[15px] font-semibold font-mono bg-[color:var(--ferari-bg)] border border-[color:var(--ferari-line)] rounded-xl px-2.5 py-2 outline-none focus:ring-2 focus:ring-[rgba(184,149,108,0.35)]"
+                  className="w-full text-[17px] font-bold font-mono bg-slate-50 border border-slate-100 rounded-xl px-2.5 py-2 outline-none focus:ring-2 focus:ring-blue-500/30"
                 />
-                <span className="text-xs text-[color:var(--ferari-muted)]">km</span>
+                <span className="text-xs text-slate-400 shrink-0">km</span>
               </div>
             </div>
-            <div className="w-px h-10 bg-[color:var(--ferari-line)] shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="lux-label mb-1">Manodopera</p>
+            <div className="app-card px-3.5 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Manodopera</p>
               <div className="flex items-center gap-1.5">
                 <input
                   type="text"
                   inputMode="decimal"
                   value={rincaroPercent}
                   onChange={(e) => { setRincaroMode('percent'); setRincaroPercent(e.target.value); }}
-                  className="w-full max-w-[64px] text-[15px] font-semibold font-mono bg-[color:var(--ferari-bg)] border border-[color:var(--ferari-line)] rounded-xl px-2.5 py-2 outline-none focus:ring-2 focus:ring-[rgba(184,149,108,0.35)]"
+                  className="w-full text-[17px] font-bold font-mono bg-slate-50 border border-slate-100 rounded-xl px-2.5 py-2 outline-none focus:ring-2 focus:ring-blue-500/30"
                 />
-                <span className="text-xs text-[color:var(--ferari-muted)]">%</span>
+                <span className="text-xs text-slate-400 shrink-0">%</span>
               </div>
             </div>
           </div>
 
-          {/* Foto obbligatorie (≥2) — stesso rule di sempre */}
-          <div className="lux-panel">
-            <div className="px-4 py-3 border-b border-[color:var(--ferari-line)] flex items-center justify-between">
-              <p className="text-[13px] font-bold text-[color:var(--ferari-ink)]">Foto cantiere</p>
-              <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${fotoCantiere.length >= 2 ? 'bg-emerald-50 text-emerald-700' : 'lux-chip'}`}>
+          <div className="app-card overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+              <p className="text-[13px] font-bold text-slate-900">Foto cantiere</p>
+              <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${fotoCantiere.length >= 2 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
                 {fotoCantiere.length}/2 min
               </span>
             </div>
             <div className="p-3 space-y-3">
               <div className="flex gap-2">
-                <label className={`flex-1 flex items-center justify-center gap-1.5 border-2 border-dashed border-slate-300 text-slate-500 text-xs font-semibold py-3 rounded-xl cursor-pointer ${caricandoFoto ? 'opacity-60 pointer-events-none' : ''}`}>
+                <label className={`flex-1 flex items-center justify-center gap-1.5 border-2 border-dashed border-slate-300 text-slate-600 text-xs font-bold py-3.5 rounded-xl cursor-pointer active:scale-[0.98] ${caricandoFoto ? 'opacity-60 pointer-events-none' : ''}`}>
                   <ImagePlus className="w-4 h-4" /> Prima
                   <input type="file" accept="image/*" multiple disabled={caricandoFoto} className="hidden" onChange={(e) => { if (e.target.files.length) gestisciFoto(e.target.files, 'prima'); e.target.value = ''; }} />
                 </label>
-                <label className={`flex-1 flex items-center justify-center gap-1.5 border-2 border-dashed border-slate-300 text-slate-500 text-xs font-semibold py-3 rounded-xl cursor-pointer ${caricandoFoto ? 'opacity-60 pointer-events-none' : ''}`}>
+                <label className={`flex-1 flex items-center justify-center gap-1.5 border-2 border-dashed border-slate-300 text-slate-600 text-xs font-bold py-3.5 rounded-xl cursor-pointer active:scale-[0.98] ${caricandoFoto ? 'opacity-60 pointer-events-none' : ''}`}>
                   <ImagePlus className="w-4 h-4" /> Dopo
                   <input type="file" accept="image/*" multiple disabled={caricandoFoto} className="hidden" onChange={(e) => { if (e.target.files.length) gestisciFoto(e.target.files, 'dopo'); e.target.value = ''; }} />
                 </label>
               </div>
               {!modificaId && fotoCantiere.length < 2 && (
-                <p className="text-[11px] text-amber-600 text-center">Servono almeno 2 foto per l'anteprima</p>
+                <p className="text-[11px] text-amber-600 text-center font-medium">Servono almeno 2 foto per l'anteprima</p>
               )}
               {fotoCantiere.length > 0 && (
                 <div className="grid grid-cols-4 gap-2">
@@ -5269,24 +5219,150 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
             </div>
           </div>
 
-          <div className="lux-panel">
-            <div className="px-4 py-3 flex items-center justify-between border-b border-[color:var(--ferari-line)]">
-              <p className="text-[13px] font-bold text-[color:var(--ferari-ink)]">
-                Elenco <span className="text-[color:var(--ferari-muted)] font-semibold">{carrello.filter(i => i.kind !== 'trasferta').length}</span>
+          <div className="app-card overflow-hidden">
+            <div className="grid grid-cols-3 divide-x divide-slate-100">
+              {[
+                { id: 'catalogo', label: 'Catalogo' },
+                { id: 'lavori', label: 'Voci' },
+                { id: 'zona', label: 'Zona' },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setRapidoExtra(rapidoExtra === tab.id ? null : tab.id)}
+                  className={`app-ripple py-3 text-xs font-bold transition-colors ${rapidoExtra === tab.id ? 'bg-[#10133a] text-white' : 'bg-white text-slate-700 active:bg-slate-50'}`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {rapidoExtra === 'catalogo' && (
+              <div className="p-3 border-t border-slate-100 space-y-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={queryCatalogoPreventivo}
+                    onChange={(e) => setQueryCatalogoPreventivo(e.target.value)}
+                    placeholder="Cerca nel catalogo…"
+                    className="w-full pl-9 pr-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/30"
+                  />
+                </div>
+                <div className="max-h-52 overflow-y-auto divide-y divide-slate-50 border border-slate-100 rounded-xl">
+                  {(queryCatalogoPreventivo.trim()
+                    ? prodotti.filter(p => visibileInZona(p, zonaAttiva) && corrispondeRicerca([p.nome, p.codice, p.descrizione].join(' '), queryCatalogoPreventivo)).slice(0, 40)
+                    : prodottiPiuUsati.length ? prodottiPiuUsati : prodotti.filter(p => visibileInZona(p, zonaAttiva)).slice(0, 20)
+                  ).map(p => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => toggleProdotto(p)}
+                      className="app-ripple w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-slate-50"
+                    >
+                      <span className="text-sm font-medium text-slate-800 truncate">{p.nome}</span>
+                      <span className="text-xs font-bold text-slate-500 shrink-0">{fmtEuro(p.prezzo)}</span>
+                    </button>
+                  ))}
+                </div>
+                <button type="button" onClick={() => setModoRapido(false)} className="w-full text-xs font-semibold text-blue-600 py-1">
+                  Apri catalogo completo con cartelle →
+                </button>
+              </div>
+            )}
+
+            {rapidoExtra === 'lavori' && (
+              <div className="p-3 border-t border-slate-100 space-y-2 max-h-64 overflow-y-auto">
+                <div className="relative mb-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={queryLavoro}
+                    onChange={(e) => setQueryLavoro(e.target.value)}
+                    placeholder="Cerca voce di lavoro…"
+                    className="w-full pl-9 pr-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/30"
+                  />
+                </div>
+                {(queryLavoro.trim()
+                  ? vociLavoro.filter(v => corrispondeRicerca(v.nome, queryLavoro))
+                  : vociLavoro
+                ).slice(0, 30).map(v => (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => aggiungiVoceSalvata(v)}
+                    className="app-ripple w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-left"
+                  >
+                    <span className="text-sm font-medium text-slate-800 truncate">{v.nome}</span>
+                    <span className="text-xs font-bold text-blue-600 shrink-0">+ Aggiungi</span>
+                  </button>
+                ))}
+                {vociLavoro.length === 0 && <p className="text-xs text-slate-400 text-center py-3">Nessuna voce salvata.</p>}
+                <button
+                  type="button"
+                  onClick={() => { setModoRapido(false); setShowNuovoLavoro(true); }}
+                  className="w-full text-xs font-semibold text-blue-600 py-2"
+                >
+                  + Nuova voce in Completa →
+                </button>
+              </div>
+            )}
+
+            {rapidoExtra === 'zona' && (
+              <div className="p-3 border-t border-slate-100 space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  {ZONE_AMBIENTI.map(function (z) {
+                    const Icon = z.Icon;
+                    const active = zonaAttiva === z.id;
+                    return (
+                      <button
+                        key={z.id}
+                        type="button"
+                        onClick={() => setZonaAttiva(z.id)}
+                        className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-left text-xs font-semibold ${active ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700'}`}
+                      >
+                        <Icon className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{z.nome}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {TEMPLATE_LAVORI.filter(t => t.zona === zonaAttiva).length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    {TEMPLATE_LAVORI.filter(t => t.zona === zonaAttiva).map(t => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => applicaTemplate(t)}
+                        className="app-ripple flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> {t.nome}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="app-card overflow-hidden">
+            <div className="px-4 py-3 flex items-center justify-between border-b border-slate-100">
+              <p className="text-[13px] font-bold text-slate-900">
+                Elenco <span className="text-slate-400 font-semibold">{carrello.filter(i => i.kind !== 'trasferta').length}</span>
               </p>
               {carrello.length > 1 && (
-                <button type="button" onClick={() => setRiordinaAperto('riepilogo')} className="text-[11px] font-bold text-[color:var(--ferari-gold)]">Riordina</button>
+                <button type="button" onClick={() => setRiordinaAperto('riepilogo')} className="text-[11px] font-bold text-blue-600">Riordina</button>
               )}
             </div>
             {carrello.filter(i => i.kind !== 'trasferta').length === 0 ? (
-              <p className="px-4 py-10 text-center text-sm text-[color:var(--ferari-muted)]">Vuoto — scrivi, incolla o parti da un preventivo.</p>
+              <p className="px-4 py-10 text-center text-sm text-slate-400">Vuoto — scrivi, incolla o copia da un preventivo.</p>
             ) : (
-              <div className="divide-y divide-[color:var(--ferari-line)] max-h-[40vh] overflow-y-auto">
+              <div className="divide-y divide-slate-50 max-h-[40vh] overflow-y-auto">
                 {carrello.filter(i => i.kind !== 'trasferta').map(item => (
                   <div key={item.id} className="px-4 py-3 flex items-center gap-2.5">
                     <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-semibold text-[color:var(--ferari-ink)] truncate">{item.nome}</p>
-                      <p className="text-[10px] text-[color:var(--ferari-muted)] truncate">{fmtEuro(item.prezzoUnitario)}{item.kind === 'prodotto' ? ` × ${item.qty}` : ''}</p>
+                      <p className="text-[13px] font-semibold text-slate-900 truncate">{item.nome}</p>
+                      <p className="text-[10px] text-slate-400 truncate">{fmtEuro(item.prezzoUnitario)}{item.kind === 'prodotto' ? ` × ${item.qty}` : ''}</p>
                     </div>
                     {item.kind === 'prodotto' && (
                       <div className="flex items-center gap-0.5 bg-slate-50 rounded-full p-0.5 shrink-0">
@@ -5308,21 +5384,24 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
 
           <div className="space-y-5 min-w-0">
 
-            <div className="app-card px-5 py-4 flex items-start justify-between gap-3">
+            <div className="app-card px-4 py-3.5 flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[11px] text-slate-400 uppercase tracking-wide font-semibold">Preventivo per</p>
+                <p className="text-[11px] text-slate-400 uppercase tracking-wide font-semibold">Preventivo per · Completa</p>
                 <p className="text-sm font-bold text-slate-900 mt-0.5">{cliente.nome} · Cantiere: {cliente.indirizzo}</p>
                 {cliente.indirizzoResidenza && (
                   <p className="text-xs text-slate-500 mt-1">Residenza: {cliente.indirizzoResidenza}</p>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => setModoRapido(true)}
-                className="app-ripple shrink-0 inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-full"
-              >
-                <Zap className="w-3.5 h-3.5" /> Torna al flusso rapido
-              </button>
+              <div className="shrink-0 inline-flex rounded-full bg-slate-100 p-0.5 text-[11px] font-bold">
+                <button type="button" className="px-2.5 py-1.5 rounded-full bg-[#10133a] text-white">Completa</button>
+                <button
+                  type="button"
+                  onClick={() => { setModoRapido(true); setRapidoExtra(null); }}
+                  className="app-ripple px-2.5 py-1.5 rounded-full text-slate-600 inline-flex items-center gap-1"
+                >
+                  <Zap className="w-3 h-3" /> Ultra
+                </button>
+              </div>
             </div>
 
             {/* zona / ambiente attivo */}
@@ -6324,9 +6403,9 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
               type="button"
               onClick={() => setShowPreview(true)}
               disabled={carrello.length === 0 || (!modificaId && fotoCantiere.length < 2)}
-              className="app-ripple lux-btn-primary shrink-0 disabled:opacity-40 disabled:shadow-none text-white text-sm font-bold px-6 py-3.5 rounded-2xl transition-all flex items-center gap-2"
+              className="app-ripple bg-[#10133a] text-white shrink-0 disabled:opacity-40 disabled:shadow-none text-white text-sm font-bold px-6 py-3.5 rounded-2xl transition-all flex items-center gap-2"
             >
-              <FileText className="w-4 h-4 text-[color:var(--ferari-gold)]" />
+              <FileText className="w-4 h-4 text-white" />
               Anteprima
             </button>
           </div>
