@@ -3,9 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no, interactive-widget=resizes-content">
+<meta name="theme-color" content="#10133a" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#10133a">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<!-- black-translucent: header scuro continua sotto la status bar = zero "pata" bianca -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Ferari">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
@@ -19,27 +21,31 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   * { box-sizing: border-box; }
-  /* RF Digital style: barra fissa + safe-area SOLO dentro la nav.
-     --nav-h = altezza contenuto icone (≈56px) + home indicator. */
+  /* Clone RF Digital: --nav-content-h = solo icone (72px). Safe-area
+     si aggiunge UNA volta: nel padding della nav + nel padding del main. */
   :root {
-    --nav-content-h: 3.5rem;
+    --nav-content-h: 4.5rem;
     --nav-h: calc(var(--nav-content-h) + env(safe-area-inset-bottom, 0px));
-    --composer-h: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+    --composer-h: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+    --ferari-navy: #10133a;
+    --ferari-bg: #eef1f5;
   }
   html {
+    height: 100%;
     height: 100dvh;
-    background: #10133a;
+    background: var(--ferari-bg);
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior: none;
   }
   body {
     margin: 0;
     width: 100%;
+    height: 100%;
     height: 100dvh;
     overflow: hidden;
     overscroll-behavior: none;
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-    background: #eef1f5;
+    background: var(--ferari-bg);
     -webkit-font-smoothing: antialiased;
   }
   #root {
@@ -48,7 +54,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    background: #eef1f5;
+    background: var(--ferari-bg);
   }
   .h-app-viewport {
     height: 100%;
@@ -62,7 +68,6 @@
     top: 0;
     bottom: auto;
   }
-  /* come RF Digital: spazio sotto i contenuti = barra + safe-area */
   .app-main-pad-bottom { padding-bottom: calc(var(--nav-h) + 1rem); }
   .app-main-pad-composer { padding-bottom: calc(var(--composer-h) + 1rem); }
   .app-main-pad-flat { padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); }
@@ -71,21 +76,39 @@
     .app-main-pad-composer,
     .app-main-pad-flat { padding-bottom: 0; }
   }
-  /* Bottom nav — clone stil RF Digital */
+  /* Barra basso: BIANCO SOLIDO (non rgba) → safe-area bianca, lipita al telefono come RF */
   .app-bottom-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    margin: 0;
+    padding: 0;
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    background: rgba(255, 255, 255, 0.92);
-    -webkit-backdrop-filter: blur(20px);
-    backdrop-filter: blur(20px);
+    background: #ffffff;
     border-top: 1px solid rgba(0, 0, 0, 0.06);
+    /* evita scivolamenti iOS / layer compositing */
+    transform: translate3d(0, 0, 0);
+    -webkit-backface-visibility: hidden;
   }
-  /* Composer footer preventivo (sostituisce la nav in modalità nuovo) */
   .app-composer-footer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    margin: 0;
+    padding: 0;
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    background: rgba(255, 255, 255, 0.96);
-    -webkit-backdrop-filter: blur(20px);
-    backdrop-filter: blur(20px);
+    background: #ffffff;
     border-top: 1px solid rgba(0, 0, 0, 0.06);
+    transform: translate3d(0, 0, 0);
+  }
+  /* Header: navy continua sotto la status bar (black-translucent) */
+  .app-topbar-mobile {
+    background: var(--ferari-navy);
+    padding-top: env(safe-area-inset-top, 0px);
   }
   #errbox { display:none; padding:24px; font-family:monospace; font-size:13px; color:#b91c1c;
             background:#fef2f2; border:1px solid #fecaca; margin:24px; border-radius:8px;
@@ -192,7 +215,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202610010640';
+const APP_VERSION = '202610010700';
 
 // R10 (chiesto da Denis: dopo un push non si vedeva conferma che l'app si
 // fosse aggiornata) — TENTATIVO IN SOSPESO, non ancora funzionante: la
@@ -2068,12 +2091,10 @@ function Sidebar({ currentPage, setCurrentPage, onLogout, mobileOpen, onMobileCl
 /* ============================================================ */
 
 function TopBar({ title, subtitle, onMenuClick }) {
-  // status-bar-style = "black" → iOS già riserva lo spazio sotto la status bar.
-  // NON aggiungere safe-area-inset-top qui: crea la "pata" grigia/bianca.
   return (
     <>
-      <header className="lg:hidden bg-[#10133a] text-white shrink-0">
-        <div className="px-4 pt-3 pb-2.5 flex items-center justify-between gap-3">
+      <header className="app-topbar-mobile lg:hidden text-white shrink-0">
+        <div className="px-4 pt-2.5 pb-2 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <img src={LOGO_BASE64} alt="" className="w-8 h-8 rounded-lg shrink-0 ring-1 ring-white/10" />
             <span className="text-sm font-semibold text-white/90 truncate">Ferari Impianti</span>
@@ -2082,8 +2103,8 @@ function TopBar({ title, subtitle, onMenuClick }) {
             <Menu className="w-5 h-5 text-white" />
           </button>
         </div>
-        <div className="px-4 pb-3.5">
-          <h1 className="text-[1.55rem] font-bold tracking-tight leading-tight">{title}</h1>
+        <div className="px-4 pb-3">
+          <h1 className="text-[1.5rem] font-bold tracking-tight leading-tight">{title}</h1>
           {subtitle && <p className="text-sm text-white/65 mt-0.5">{subtitle}</p>}
         </div>
       </header>
@@ -2120,11 +2141,9 @@ function MobileBottomNav({ currentPage, setCurrentPage }) {
     { id: 'catalogo', label: 'Catalogo', icon: ShoppingBag },
   ];
 
-  // Clone RF Digital: fixed + blur + safe-area SOLO nel padding della nav
-  // (niente doppio spazio sotto le icone).
   return (
-    <nav className="app-bottom-nav lg:hidden fixed inset-x-0 bottom-0 z-40">
-      <div className="mx-auto flex max-w-lg items-stretch justify-around px-1 pt-1" style={{ height: 'var(--nav-content-h)' }}>
+    <nav className="app-bottom-nav lg:hidden">
+      <div className="mx-auto flex max-w-lg items-stretch justify-around px-1" style={{ height: 'var(--nav-content-h)' }}>
         {items.map(function (item) {
           const Icon = item.icon;
           const isActive = currentPage === item.id;
@@ -4140,51 +4159,78 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
     });
   };
 
-  // R8: "riga veloce" — un materiale per volta, scritto come lo diceva già a
-  // voce/a memoria ("valvola a sfera 18" o "valvola a sfera - 18€"), invio,
-  // e via: trovato nel catalogo riusa il prezzo salvato, altrimenti crea il
-  // prodotto al volo col prezzo scritto. Zero categorie da scegliere prima.
+  // Ultra: elabora testo → prodotti (1 o N righe / incolla lista). Un solo update carrello.
   const aggiungiRigaChat = async () => {
-    const testo = chatRigaTesto.trim();
-    if (!testo || chatSalvando) return;
-    // il prezzo, se scritto, è l'ultimo numero della riga, MA solo se
-    // staccato da uno spazio vero prima (con o senza trattino/€) — senza
-    // questo lo spazio obbligatorio, nomi tecnici che finiscono già con un
-    // numero attaccato (es. "...2x0,50", "...ip65") venivano tagliati per
-    // sbaglio, scambiando parte del nome per un prezzo (bug trovato con un
-    // preventivo reale durante un test)
-    const matchPrezzo = testo.match(/\s[-–—]?\s*(\d+(?:[.,]\d{1,2})?)\s*€?\s*$/);
-    let nome = testo;
-    let prezzoScritto = null;
-    if (matchPrezzo) {
-      prezzoScritto = parseFloat(matchPrezzo[1].replace(',', '.'));
-      nome = testo.slice(0, matchPrezzo.index).replace(/[-–—]\s*$/, '').trim();
-    }
-    if (!nome) return;
+    const grezzo = chatRigaTesto.trim();
+    if (!grezzo || chatSalvando) return;
+    const righe = grezzo.split(/\n+/).map(r => r.trim()).filter(Boolean);
     setChatRigaTesto('');
-    const esistente = prodotti.find(p => normalizzaRicerca(p.nome) === normalizzaRicerca(nome))
-      || prodotti.find(p => corrispondeRicerca(p.nome, nome));
-    if (esistente) {
-      aggiungiOIncrementaProdotto(esistente);
-      setChatUltimaAzione({ tipo: 'trovato', nome: esistente.nome, prezzo: esistente.prezzo });
-      return;
-    }
     setChatSalvando(true);
-    const payload = {
-      nome, categoria: indovinaCategoria(nome, activeCat), sottocategoria: 'Generico', tier: 'Standard',
-      prezzo: prezzoScritto || 0, fornitore: 'Generico', unita: 'pz', descrizione: '',
-    };
-    const { data, error } = await sb.from('prodotti').insert(prodottoToRow(payload)).select().single();
-    setChatSalvando(false);
-    if (error) {
-      mostraToast('Errore: ' + error.message);
-      setChatRigaTesto(testo);
-      return;
+    try {
+      let catalogoLocale = [...prodotti];
+      const nuoviDaSalvare = [];
+      const risolti = [];
+      for (const testo of righe) {
+        const matchPrezzo = testo.match(/\s[-–—]?\s*(\d+(?:[.,]\d{1,2})?)\s*€?\s*$/);
+        let nome = testo;
+        let prezzoScritto = null;
+        if (matchPrezzo) {
+          prezzoScritto = parseFloat(matchPrezzo[1].replace(',', '.'));
+          nome = testo.slice(0, matchPrezzo.index).replace(/[-–—]\s*$/, '').trim();
+        }
+        if (!nome) continue;
+        const esistente = catalogoLocale.find(p => normalizzaRicerca(p.nome) === normalizzaRicerca(nome))
+          || catalogoLocale.find(p => corrispondeRicerca(p.nome, nome));
+        if (esistente) {
+          risolti.push({ prodotto: esistente, tipo: 'trovato' });
+          continue;
+        }
+        const payload = {
+          nome, categoria: indovinaCategoria(nome, activeCat), sottocategoria: 'Generico', tier: 'Standard',
+          prezzo: prezzoScritto || 0, fornitore: 'Generico', unita: 'pz', descrizione: '',
+        };
+        const { data, error } = await sb.from('prodotti').insert(prodottoToRow(payload)).select().single();
+        if (error) throw new Error(error.message);
+        const nuovoProdotto = prodottoFromRow(data);
+        catalogoLocale = [nuovoProdotto, ...catalogoLocale];
+        nuoviDaSalvare.push(nuovoProdotto);
+        risolti.push({ prodotto: nuovoProdotto, tipo: 'creato' });
+      }
+      if (nuoviDaSalvare.length) setProdotti(prev => [...nuoviDaSalvare, ...prev]);
+      if (risolti.length === 0) { setChatSalvando(false); return; }
+      setCarrello(prev => {
+        let next = [...prev];
+        risolti.forEach(({ prodotto: p }) => {
+          const esiste = next.find(i => i.id === p.id);
+          if (esiste) {
+            const nuovaQty = esiste.qty + 1;
+            next = next.map(i => i.id === p.id ? { ...i, qty: nuovaQty, meta: metaProdotto(p, nuovaQty) } : i);
+          } else {
+            next.push({
+              id: p.id, nome: p.nome, meta: metaProdotto(p, 1), prezzoUnitario: p.prezzo, qty: 1, kind: 'prodotto',
+              unita: p.unita, zona: zonaAttiva, tipoInstallazione: 'nuova',
+              fornitore: p.fornitore, misuraLunghezza: p.misuraLunghezza, misuraProfondita: p.misuraProfondita,
+              misuraAltezza: p.misuraAltezza, descrizioneProdotto: p.descrizione,
+            });
+          }
+        });
+        return next;
+      });
+      const ultimo = risolti[risolti.length - 1];
+      setChatUltimaAzione(risolti.length > 1
+        ? { tipo: 'trovato', nome: `${risolti.length} materiali aggiunti`, prezzo: 0 }
+        : { tipo: ultimo.tipo, nome: ultimo.prodotto.nome, prezzo: ultimo.prodotto.prezzo });
+    } catch (err) {
+      mostraToast('Errore: ' + (err.message || err));
+      setChatRigaTesto(grezzo);
     }
-    const nuovoProdotto = prodottoFromRow(data);
-    setProdotti(prev => [nuovoProdotto, ...prev]);
-    aggiungiOIncrementaProdotto(nuovoProdotto);
-    setChatUltimaAzione({ tipo: 'creato', nome, prezzo: prezzoScritto || 0 });
+    setChatSalvando(false);
+  };
+
+  const applicaCarrelloDaPreventivo = (p) => {
+    if (!p) return;
+    setCarrello((p.carrelloSnapshot || []).map(item => ({ ...item })));
+    setChatUltimaAzione({ tipo: 'trovato', nome: `Copia da ${p.id}`, prezzo: p.importo || 0 });
   };
 
   // P3: quantità multiple per i prodotti già nel carrello
@@ -5007,78 +5053,94 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
           />
         </div>
       ) : modoRapido ? (
-        /* ========== MODO RAPIDO — Denis in <15 min ========== */
-        <div className="space-y-4 pb-2">
-          {/* Header cliente + toggle */}
-          <div className="app-card px-4 py-3.5 flex items-start gap-3">
-            <button
-              type="button"
-              onClick={() => { setClienteId(null); setRapidoExtra(null); }}
-              className="app-ripple mt-0.5 w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 shrink-0"
-              aria-label="Cambia cliente"
-            >
+        <div className="space-y-3 pb-2">
+          <div className="flex items-center gap-3 px-0.5">
+            <button type="button" onClick={() => { setClienteId(null); setRapidoExtra(null); }} className="app-ripple w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 shrink-0 shadow-sm" aria-label="Indietro">
               <ArrowLeft className="w-4 h-4" />
             </button>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
-                  <Zap className="w-3 h-3" /> Rapido
-                </span>
-                {modificaId && <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">Modifica</span>}
-              </div>
-              <p className="text-sm font-bold text-slate-900 mt-1 truncate">{cliente.nome}</p>
-              <p className="text-xs text-slate-400 truncate">{cliente.indirizzo}</p>
+              <p className="text-[15px] font-bold text-slate-900 truncate leading-tight">{cliente.nome}</p>
+              <p className="text-[11px] text-slate-400 truncate">{cliente.indirizzo}</p>
             </div>
-            <button
-              type="button"
-              onClick={() => setModoRapido(false)}
-              className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 shrink-0 pt-1"
-            >
-              Completa →
+            <button type="button" onClick={() => setModoRapido(false)} className="text-[11px] font-semibold text-slate-400 hover:text-slate-700 shrink-0 px-2">
+              Altro
             </button>
           </div>
 
-          {/* Chat materiali — hero */}
-          <div className="app-card overflow-hidden">
-            <div className="px-4 pt-4 pb-2">
-              <p className="text-sm font-bold text-slate-900">Aggiungi materiale</p>
-              <p className="text-xs text-slate-400 mt-0.5">Scrivi e invia — come a voce. Es. <span className="font-medium text-slate-500">Valvola 1/2 - 18</span></p>
+          {preventivi.filter(p => (p.carrelloSnapshot || []).length > 0).slice(0, 6).length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 px-0.5">Parti da</p>
+              <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                {preventivi.filter(p => (p.carrelloSnapshot || []).length > 0).slice(0, 6).map(p => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => applicaCarrelloDaPreventivo(p)}
+                    className="app-ripple shrink-0 px-3.5 py-2.5 rounded-2xl bg-white border border-slate-200 text-left shadow-sm active:scale-[0.98]"
+                  >
+                    <p className="text-xs font-bold text-slate-900 truncate max-w-[140px]">{p.cliente || 'Preventivo'}</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{(p.carrelloSnapshot || []).length} voci · {fmtEuro(p.importo)}</p>
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="px-4 pb-4">
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={chatRigaTesto}
-                  onChange={(e) => setChatRigaTesto(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && aggiungiRigaChat()}
-                  placeholder="Nome materiale…"
-                  disabled={chatSalvando}
-                  autoFocus
-                  className="flex-1 min-w-0 px-4 py-3.5 text-[16px] bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 disabled:opacity-60"
-                />
+          )}
+
+          {TEMPLATE_LAVORI.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto pb-0.5 -mx-1 px-1">
+              {TEMPLATE_LAVORI.slice(0, 5).map(t => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => { setZonaAttiva(t.zona); applicaTemplate(t); }}
+                  className="app-ripple shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-full text-[11px] font-semibold bg-[#10133a] text-white"
+                >
+                  <Zap className="w-3 h-3" /> {t.nome}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="px-4 pt-4 pb-2">
+              <p className="text-[13px] font-bold text-slate-900">Materiali</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">Una riga ciascuno. Puoi anche incollare tutta la lista.</p>
+            </div>
+            <div className="px-4 pb-3">
+              <textarea
+                value={chatRigaTesto}
+                onChange={(e) => setChatRigaTesto(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    aggiungiRigaChat();
+                  }
+                }}
+                placeholder={"Valvola 1/2 - 18\nTubo rame 16 - 4,50\n..."}
+                disabled={chatSalvando}
+                rows={3}
+                className="w-full px-3.5 py-3 text-[15px] leading-relaxed bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500 resize-none disabled:opacity-60"
+              />
+              <div className="flex items-center gap-2 mt-2.5">
                 <button
                   type="button"
                   onClick={aggiungiRigaChat}
                   disabled={!chatRigaTesto.trim() || chatSalvando}
-                  className="app-ripple shrink-0 w-14 h-14 rounded-2xl bg-[#10133a] hover:bg-[#1a1f4d] disabled:bg-slate-200 text-white flex items-center justify-center transition-colors shadow-lg shadow-slate-900/10"
+                  className="app-ripple flex-1 h-12 rounded-2xl bg-[#10133a] hover:bg-[#1a1f4d] disabled:bg-slate-200 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors"
                 >
-                  <Plus className="w-6 h-6" />
+                  <Plus className="w-5 h-5" />
+                  {chatSalvando ? 'Aggiungo…' : 'Aggiungi'}
                 </button>
               </div>
               {chatUltimaAzione && (
-                <p className={`text-xs font-semibold mt-2.5 ${chatUltimaAzione.tipo === 'trovato' ? 'text-emerald-600' : 'text-blue-600'}`}>
-                  {chatUltimaAzione.tipo === 'trovato'
-                    ? `✓ ${chatUltimaAzione.nome} · ${chatUltimaAzione.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €`
-                    : `✓ Nuovo: ${chatUltimaAzione.nome} · ${chatUltimaAzione.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €`}
+                <p className={`text-xs font-semibold mt-2 ${chatUltimaAzione.tipo === 'trovato' ? 'text-emerald-600' : 'text-blue-600'}`}>
+                  ✓ {chatUltimaAzione.nome}{chatUltimaAzione.prezzo ? ` · ${chatUltimaAzione.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €` : ''}
                 </p>
               )}
             </div>
-
-            {/* Preferiti / più usati */}
             {prodottiPiuUsati.length > 0 && (
-              <div className="px-4 pb-4 border-t border-slate-50 pt-3">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Più usati</p>
-                <div className="flex gap-2 overflow-x-auto pb-0.5 -mx-1 px-1">
+              <div className="px-4 pb-4 border-t border-slate-100 pt-3">
+                <div className="flex gap-2 overflow-x-auto -mx-1 px-1">
                   {prodottiPiuUsati.map(p => {
                     const isAdded = !!carrello.find(i => i.id === p.id);
                     return (
@@ -5086,10 +5148,10 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
                         key={p.id}
                         type="button"
                         onClick={() => toggleProdotto(p)}
-                        className={`app-ripple shrink-0 flex items-center gap-1.5 px-3.5 py-2.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${isAdded ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700 active:bg-slate-200'}`}
+                        className={`app-ripple shrink-0 flex items-center gap-1 px-3 py-2 rounded-full text-[11px] font-semibold ${isAdded ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}
                       >
-                        {isAdded ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-                        {p.nome.length > 24 ? p.nome.slice(0, 24) + '…' : p.nome}
+                        {isAdded ? <Check className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                        {p.nome.length > 20 ? p.nome.slice(0, 20) + '…' : p.nome}
                       </button>
                     );
                   })}
@@ -5098,220 +5160,69 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
             )}
           </div>
 
-          {/* Carrello compatto */}
-          <div className="app-card overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-              <p className="text-sm font-bold text-slate-900">
-                Voci <span className="text-slate-400 font-semibold">({carrello.filter(i => i.kind !== 'trasferta').length})</span>
+          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm px-4 py-3.5 flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Km A/R</p>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={kmTrasferta}
+                  onChange={(e) => setKmTrasferta(e.target.value)}
+                  placeholder="0"
+                  className="w-full max-w-[72px] text-[15px] font-semibold font-mono bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 outline-none focus:ring-2 focus:ring-blue-500/25"
+                />
+                <span className="text-xs text-slate-400">km</span>
+              </div>
+            </div>
+            <div className="w-px h-10 bg-slate-100 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Manodopera</p>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={rincaroPercent}
+                  onChange={(e) => { setRincaroMode('percent'); setRincaroPercent(e.target.value); }}
+                  className="w-full max-w-[64px] text-[15px] font-semibold font-mono bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 outline-none focus:ring-2 focus:ring-blue-500/25"
+                />
+                <span className="text-xs text-slate-400">%</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 flex items-center justify-between border-b border-slate-100">
+              <p className="text-[13px] font-bold text-slate-900">
+                Elenco <span className="text-slate-400 font-semibold">{carrello.filter(i => i.kind !== 'trasferta').length}</span>
               </p>
               {carrello.length > 1 && (
-                <button type="button" onClick={() => setRiordinaAperto('riepilogo')} className="text-[11px] font-semibold text-blue-600">
-                  Riordina
-                </button>
+                <button type="button" onClick={() => setRiordinaAperto('riepilogo')} className="text-[11px] font-semibold text-blue-600">Riordina</button>
               )}
             </div>
             {carrello.filter(i => i.kind !== 'trasferta').length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-slate-400">Nessuna voce ancora — scrivi sopra o tocca un preferito.</p>
+              <p className="px-4 py-10 text-center text-sm text-slate-400">Vuoto — scrivi, incolla o parti da un preventivo.</p>
             ) : (
-              <div className="divide-y divide-slate-50">
+              <div className="divide-y divide-slate-50 max-h-[40vh] overflow-y-auto">
                 {carrello.filter(i => i.kind !== 'trasferta').map(item => (
-                  <div key={item.id} className="px-4 py-3 flex items-center gap-3">
+                  <div key={item.id} className="px-4 py-3 flex items-center gap-2.5">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-slate-900 truncate">{item.nome}</p>
-                      <p className="text-[11px] text-slate-400 truncate">{item.meta || item.kind}</p>
+                      <p className="text-[13px] font-semibold text-slate-900 truncate">{item.nome}</p>
+                      <p className="text-[10px] text-slate-400 truncate">{fmtEuro(item.prezzoUnitario)}{item.kind === 'prodotto' ? ` × ${item.qty}` : ''}</p>
                     </div>
                     {item.kind === 'prodotto' && (
-                      <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-full px-1 py-1 shrink-0">
-                        <button type="button" onClick={() => aggiornaQtyProdotto(item.id, item.qty - 1)} className="app-ripple w-7 h-7 rounded-full bg-white text-slate-600 font-bold text-sm">−</button>
-                        <span className="w-7 text-center text-xs font-mono font-semibold text-slate-800">{item.qty}</span>
-                        <button type="button" onClick={() => aggiornaQtyProdotto(item.id, item.qty + 1)} className="app-ripple w-7 h-7 rounded-full bg-white text-slate-600 font-bold text-sm">+</button>
+                      <div className="flex items-center gap-0.5 bg-slate-50 rounded-full p-0.5 shrink-0">
+                        <button type="button" onClick={() => aggiornaQtyProdotto(item.id, item.qty - 1)} className="app-ripple w-8 h-8 rounded-full text-slate-600 font-bold">−</button>
+                        <span className="w-6 text-center text-xs font-mono font-bold">{item.qty}</span>
+                        <button type="button" onClick={() => aggiornaQtyProdotto(item.id, item.qty + 1)} className="app-ripple w-8 h-8 rounded-full text-slate-600 font-bold">+</button>
                       </div>
                     )}
-                    <span className="text-sm font-bold text-slate-900 shrink-0 w-16 text-right">{fmtEuro(Math.round(item.prezzoUnitario * item.qty))}</span>
-                    <button type="button" onClick={() => rimuoviVoce(item.id)} className="text-slate-300 hover:text-red-500 shrink-0"><X className="w-4 h-4" /></button>
+                    <span className="text-[13px] font-bold text-slate-900 shrink-0 w-[4.5rem] text-right">{fmtEuro(Math.round(item.prezzoUnitario * item.qty))}</span>
+                    <button type="button" onClick={() => rimuoviVoce(item.id)} className="text-slate-300 hover:text-red-500 shrink-0 p-1"><X className="w-4 h-4" /></button>
                   </div>
                 ))}
               </div>
             )}
-          </div>
-
-          {/* Extra collassabili — tutto il resto senza rumor */}
-          <div className="space-y-2">
-            {[
-              { id: 'zona', label: 'Zona / template rapidi' },
-              { id: 'manodopera', label: 'Manodopera e trasferta' },
-              { id: 'lavori', label: 'Voci di lavoro salvate' },
-              { id: 'catalogo', label: 'Sfoglia catalogo' },
-              { id: 'foto', label: `Foto cantiere${fotoCantiere.length ? ` (${fotoCantiere.length})` : ''}` },
-            ].map(sec => (
-              <div key={sec.id} className="app-card overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setRapidoExtra(rapidoExtra === sec.id ? null : sec.id)}
-                  className="app-ripple w-full px-4 py-3.5 flex items-center justify-between text-left"
-                >
-                  <span className="text-sm font-semibold text-slate-800">{sec.label}</span>
-                  <span className={`text-slate-400 text-lg leading-none transition-transform ${rapidoExtra === sec.id ? 'rotate-90' : ''}`}>›</span>
-                </button>
-                {rapidoExtra === sec.id && sec.id === 'zona' && (
-                  <div className="px-3 pb-4 border-t border-slate-50 pt-3 space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
-                      {ZONE_AMBIENTI.map(function (z) {
-                        const Icon = z.Icon;
-                        const active = zonaAttiva === z.id;
-                        return (
-                          <button
-                            key={z.id}
-                            type="button"
-                            onClick={() => setZonaAttiva(z.id)}
-                            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-left text-xs font-semibold ${active ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700'}`}
-                          >
-                            <Icon className="w-3.5 h-3.5 shrink-0" />
-                            <span className="truncate">{z.nome}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {TEMPLATE_LAVORI.filter(t => t.zona === zonaAttiva).length > 0 && (
-                      <div className="flex flex-col gap-2">
-                        {TEMPLATE_LAVORI.filter(t => t.zona === zonaAttiva).map(t => (
-                          <button
-                            key={t.id}
-                            type="button"
-                            onClick={() => applicaTemplate(t)}
-                            className="app-ripple flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100"
-                          >
-                            <Plus className="w-3.5 h-3.5" /> {t.nome}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-                {rapidoExtra === sec.id && sec.id === 'manodopera' && (
-                  <div className="px-4 pb-4 border-t border-slate-50 pt-3 space-y-3">
-                    <div className="flex gap-2">
-                      <button type="button" onClick={() => setRincaroMode('percent')} className={`flex-1 py-2 rounded-lg text-xs font-bold ${rincaroMode === 'percent' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}>% sul materiale</button>
-                      <button type="button" onClick={() => setRincaroMode('ore')} className={`flex-1 py-2 rounded-lg text-xs font-bold ${rincaroMode === 'ore' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}>Ore × tariffa</button>
-                    </div>
-                    {rincaroMode === 'percent' ? (
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-slate-600">Percentuale</span>
-                        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
-                          <input type="text" inputMode="decimal" value={rincaroPercent} onChange={(e) => setRincaroPercent(e.target.value)} className="w-12 bg-transparent text-right text-sm font-mono outline-none" />
-                          <span className="text-slate-400 text-xs">%</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-slate-600">Ore</span>
-                          <input type="text" inputMode="decimal" value={rincaroOre} onChange={(e) => setRincaroOre(e.target.value)} className="w-16 text-right text-sm font-mono bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none" />
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-slate-600">€/ora</span>
-                          <input type="text" inputMode="decimal" value={rincaroTariffa} onChange={(e) => setRincaroTariffa(e.target.value)} className="w-16 text-right text-sm font-mono bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none" />
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between border-t border-slate-100 pt-3">
-                      <span className="text-xs font-semibold text-slate-500">Manodopera</span>
-                      <span className="text-sm font-bold">{fmtEuro(Math.round(rincaroValore))}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm text-slate-600">Km A/R</span>
-                      <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
-                        <input type="text" inputMode="decimal" value={kmTrasferta} onChange={(e) => setKmTrasferta(e.target.value)} placeholder="0" className="w-14 bg-transparent text-right text-sm font-mono outline-none" />
-                        <span className="text-slate-400 text-xs">km</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-500">Trasferta</span>
-                      <span className="text-sm font-bold">{fmtEuro(Math.round(subtotaleTrasferta))}</span>
-                    </div>
-                  </div>
-                )}
-                {rapidoExtra === sec.id && sec.id === 'lavori' && (
-                  <div className="px-4 pb-4 border-t border-slate-50 pt-3 space-y-2 max-h-56 overflow-y-auto">
-                    {vociLavoro.slice(0, 20).map(v => (
-                      <button
-                        key={v.id}
-                        type="button"
-                        onClick={() => aggiungiVoceSalvata(v)}
-                        className="app-ripple w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-left"
-                      >
-                        <span className="text-sm font-medium text-slate-800 truncate">{v.nome}</span>
-                        <span className="text-xs font-bold text-blue-600 shrink-0">+ Aggiungi</span>
-                      </button>
-                    ))}
-                    {vociLavoro.length === 0 && <p className="text-xs text-slate-400 text-center py-3">Nessuna voce salvata.</p>}
-                    <button type="button" onClick={() => { setModoRapido(false); setShowNuovoLavoro(true); }} className="w-full text-xs font-semibold text-slate-500 py-2">
-                      + Nuova voce in modalità completa
-                    </button>
-                  </div>
-                )}
-                {rapidoExtra === sec.id && sec.id === 'catalogo' && (
-                  <div className="px-4 pb-4 border-t border-slate-50 pt-3 space-y-3">
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input
-                        type="text"
-                        value={queryCatalogoPreventivo}
-                        onChange={(e) => setQueryCatalogoPreventivo(e.target.value)}
-                        placeholder="Cerca nel catalogo…"
-                        className="w-full pl-9 pr-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/30"
-                      />
-                    </div>
-                    <div className="max-h-52 overflow-y-auto divide-y divide-slate-50 border border-slate-100 rounded-xl">
-                      {(queryCatalogoPreventivo.trim()
-                        ? prodotti.filter(p => visibileInZona(p, zonaAttiva) && corrispondeRicerca([p.nome, p.codice, p.descrizione].join(' '), queryCatalogoPreventivo)).slice(0, 30)
-                        : prodottiPiuUsati
-                      ).map(p => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => toggleProdotto(p)}
-                          className="app-ripple w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-slate-50"
-                        >
-                          <span className="text-sm font-medium text-slate-800 truncate">{p.nome}</span>
-                          <span className="text-xs font-bold text-slate-500 shrink-0">{fmtEuro(p.prezzo)}</span>
-                        </button>
-                      ))}
-                    </div>
-                    <button type="button" onClick={() => setModoRapido(false)} className="w-full text-xs font-semibold text-blue-600 py-1">
-                      Apri catalogo completo →
-                    </button>
-                  </div>
-                )}
-                {rapidoExtra === sec.id && sec.id === 'foto' && (
-                  <div className="px-4 pb-4 border-t border-slate-50 pt-3 space-y-3">
-                    <p className="text-xs text-slate-400">Opzionale — puoi aggiungere le foto anche dopo.</p>
-                    <div className="flex gap-2">
-                      <label className={`flex-1 flex items-center justify-center gap-1.5 border-2 border-dashed border-slate-300 text-slate-500 text-xs font-semibold py-3 rounded-xl cursor-pointer ${caricandoFoto ? 'opacity-60 pointer-events-none' : ''}`}>
-                        <ImagePlus className="w-4 h-4" /> Prima
-                        <input type="file" accept="image/*" multiple disabled={caricandoFoto} className="hidden" onChange={(e) => { if (e.target.files.length) gestisciFoto(e.target.files, 'prima'); e.target.value = ''; }} />
-                      </label>
-                      <label className={`flex-1 flex items-center justify-center gap-1.5 border-2 border-dashed border-slate-300 text-slate-500 text-xs font-semibold py-3 rounded-xl cursor-pointer ${caricandoFoto ? 'opacity-60 pointer-events-none' : ''}`}>
-                        <ImagePlus className="w-4 h-4" /> Dopo
-                        <input type="file" accept="image/*" multiple disabled={caricandoFoto} className="hidden" onChange={(e) => { if (e.target.files.length) gestisciFoto(e.target.files, 'dopo'); e.target.value = ''; }} />
-                      </label>
-                    </div>
-                    {fotoCantiere.length > 0 && (
-                      <div className="grid grid-cols-4 gap-2">
-                        {fotoCantiere.map(f => (
-                          <div key={f.id} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200">
-                            <img src={f.url} alt="" className="w-full h-full object-cover" />
-                            <button type="button" onClick={() => rimuoviFoto(f.id)} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center">
-                              <X className="w-3 h-3" />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
           </div>
         </div>
       ) : (
@@ -6322,8 +6233,8 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
       {/* Footer fisso Totale/Anteprima — sostituisce la bottom nav in modalità nuovo.
           Un solo livello in fondo (niente sticky sopra la nav = niente "buco"). */}
       {cliente && !showPreview && !riordinaAperto && (
-        <div className="app-composer-footer lg:hidden fixed inset-x-0 bottom-0 z-40">
-          <div className="px-4 py-3 flex items-center justify-between gap-3">
+        <div className="app-composer-footer lg:hidden">
+          <div className="px-4 py-3 flex items-center justify-between gap-3" style={{ minHeight: '4.75rem' }}>
             <div className="min-w-0">
               <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Totale</p>
               <p className="text-xl font-bold text-slate-900 tracking-tight">{fmtEuro(Math.round(totale))}</p>
@@ -6331,7 +6242,7 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
             <button
               onClick={() => setShowPreview(true)}
               disabled={carrello.length === 0}
-              className="app-ripple shrink-0 bg-[#10133a] hover:bg-[#1a1f4d] disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-semibold px-6 py-3 rounded-2xl transition-colors flex items-center gap-2 shadow-lg shadow-slate-900/15"
+              className="app-ripple shrink-0 bg-[#10133a] hover:bg-[#1a1f4d] disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-semibold px-6 py-3.5 rounded-2xl transition-colors flex items-center gap-2"
             >
               <FileText className="w-4 h-4" />
               Anteprima
