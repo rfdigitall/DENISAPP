@@ -19,16 +19,16 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   * { box-sizing: border-box; }
-  /* --nav-h: altezza vera della barra di navigazione mobile (fixed, vedi
-     .app-bottom-nav) — h-14 (56px) più l'eventuale home indicator. Usata
-     anche per lo spazio da lasciare sotto i contenuti (main) e per far
-     fermare la barra "Totale/Anteprima" appena sopra, invece che sotto. */
-  :root { --nav-h: calc(3.5rem + env(safe-area-inset-bottom, 0px)); }
-  /* Altezza: un solo meccanismo, "100dvh" — niente più calcoli via JS su
-     visualViewport (vedi nota più sotto, dove prima c'era syncAppHeight). */
+  /* RF Digital style: barra fissa + safe-area SOLO dentro la nav.
+     --nav-h = altezza contenuto icone (≈56px) + home indicator. */
+  :root {
+    --nav-content-h: 3.5rem;
+    --nav-h: calc(var(--nav-content-h) + env(safe-area-inset-bottom, 0px));
+    --composer-h: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+  }
   html {
     height: 100dvh;
-    background: #eef1f5;
+    background: #10133a;
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior: none;
   }
@@ -38,7 +38,7 @@
     height: 100dvh;
     overflow: hidden;
     overscroll-behavior: none;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
     background: #eef1f5;
     -webkit-font-smoothing: antialiased;
   }
@@ -48,6 +48,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    background: #eef1f5;
   }
   .h-app-viewport {
     height: 100%;
@@ -61,11 +62,30 @@
     top: 0;
     bottom: auto;
   }
-  /* main sotto la barra: la barra ora è "fixed" (fuori dal flusso flex),
-     quindi main deve lasciarle spazio sotto per non finirci nascosto dietro. */
+  /* come RF Digital: spazio sotto i contenuti = barra + safe-area */
   .app-main-pad-bottom { padding-bottom: calc(var(--nav-h) + 1rem); }
+  .app-main-pad-composer { padding-bottom: calc(var(--composer-h) + 1rem); }
+  .app-main-pad-flat { padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); }
   @media (min-width: 1024px) {
-    .app-main-pad-bottom { padding-bottom: 0; }
+    .app-main-pad-bottom,
+    .app-main-pad-composer,
+    .app-main-pad-flat { padding-bottom: 0; }
+  }
+  /* Bottom nav — clone stil RF Digital */
+  .app-bottom-nav {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: rgba(255, 255, 255, 0.92);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+  }
+  /* Composer footer preventivo (sostituisce la nav in modalità nuovo) */
+  .app-composer-footer {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: rgba(255, 255, 255, 0.96);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
   }
   #errbox { display:none; padding:24px; font-family:monospace; font-size:13px; color:#b91c1c;
             background:#fef2f2; border:1px solid #fecaca; margin:24px; border-radius:8px;
@@ -172,7 +192,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202610011730';
+const APP_VERSION = '202610010640';
 
 // R10 (chiesto da Denis: dopo un push non si vedeva conferma che l'app si
 // fosse aggiornata) — TENTATIVO IN SOSPESO, non ancora funzionante: la
@@ -2048,10 +2068,12 @@ function Sidebar({ currentPage, setCurrentPage, onLogout, mobileOpen, onMobileCl
 /* ============================================================ */
 
 function TopBar({ title, subtitle, onMenuClick }) {
+  // status-bar-style = "black" → iOS già riserva lo spazio sotto la status bar.
+  // NON aggiungere safe-area-inset-top qui: crea la "pata" grigia/bianca.
   return (
     <>
-      <header className="lg:hidden bg-[#10133a] text-white shrink-0 pt-[max(0.5rem,env(safe-area-inset-top))]">
-        <div className="px-4 py-3 flex items-center justify-between gap-3">
+      <header className="lg:hidden bg-[#10133a] text-white shrink-0">
+        <div className="px-4 pt-3 pb-2.5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <img src={LOGO_BASE64} alt="" className="w-8 h-8 rounded-lg shrink-0 ring-1 ring-white/10" />
             <span className="text-sm font-semibold text-white/90 truncate">Ferari Impianti</span>
@@ -2060,8 +2082,8 @@ function TopBar({ title, subtitle, onMenuClick }) {
             <Menu className="w-5 h-5 text-white" />
           </button>
         </div>
-        <div className="px-4 pb-4">
-          <h1 className="text-[1.65rem] font-bold tracking-tight leading-tight">{title}</h1>
+        <div className="px-4 pb-3.5">
+          <h1 className="text-[1.55rem] font-bold tracking-tight leading-tight">{title}</h1>
           {subtitle && <p className="text-sm text-white/65 mt-0.5">{subtitle}</p>}
         </div>
       </header>
@@ -2098,12 +2120,11 @@ function MobileBottomNav({ currentPage, setCurrentPage }) {
     { id: 'catalogo', label: 'Catalogo', icon: ShoppingBag },
   ];
 
+  // Clone RF Digital: fixed + blur + safe-area SOLO nel padding della nav
+  // (niente doppio spazio sotto le icone).
   return (
-    <nav
-      className="app-bottom-nav lg:hidden fixed inset-x-0 bottom-0 z-40 bg-white border-t border-slate-200"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-    >
-      <div className="grid grid-cols-4 h-14">
+    <nav className="app-bottom-nav lg:hidden fixed inset-x-0 bottom-0 z-40">
+      <div className="mx-auto flex max-w-lg items-stretch justify-around px-1 pt-1" style={{ height: 'var(--nav-content-h)' }}>
         {items.map(function (item) {
           const Icon = item.icon;
           const isActive = currentPage === item.id;
@@ -2112,14 +2133,12 @@ function MobileBottomNav({ currentPage, setCurrentPage }) {
               key={item.id}
               type="button"
               onClick={() => setCurrentPage(item.id)}
-              className={`app-ripple flex flex-col items-center justify-center gap-1 px-1 transition-colors ${isActive ? 'text-blue-700' : 'text-slate-400'}`}
+              className={`app-ripple flex flex-1 flex-col items-center justify-center gap-0.5 px-1 transition-colors active:scale-95 ${isActive ? 'text-blue-600' : 'text-slate-400'}`}
             >
-              {/* pastilla Material — l'icona attiva ha uno sfondo colorato
-                  dietro, non solo un cambio di colore (stile Gmail/WhatsApp) */}
-              <span className={`flex items-center justify-center w-12 h-7 rounded-full transition-colors ${isActive ? 'bg-blue-100' : ''}`}>
-                <Icon className="w-5 h-5" strokeWidth={isActive ? 2.25 : 2} />
+              <span className={`flex h-8 w-8 items-center justify-center rounded-[10px] transition-colors ${isActive ? 'bg-blue-600/12' : ''}`}>
+                <Icon className="w-5 h-5" strokeWidth={isActive ? 2.25 : 1.75} />
               </span>
-              <span className={`text-[10px] leading-none ${isActive ? 'font-bold' : 'font-semibold'}`}>{item.label}</span>
+              <span className={`text-[10px] leading-none ${isActive ? 'font-semibold' : 'font-medium'}`}>{item.label}</span>
             </button>
           );
         })}
@@ -3631,7 +3650,7 @@ function PdfClienteSceltaModal({ dati, onScegli, onChiudi }) {
 /* ============================================================ */
 /* PREVENTIVI PAGE                                               */
 /* ============================================================ */
-function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPreventivi, preventiviLoading, prodotti, setProdotti, vociLavoro, setVociLavoro, prezzoKm, presetClienteId, onConsumePreset, presetDettaglioId, onConsumePresetDettaglio }) {
+function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPreventivi, preventiviLoading, prodotti, setProdotti, vociLavoro, setVociLavoro, prezzoKm, presetClienteId, onConsumePreset, presetDettaglioId, onConsumePresetDettaglio, onLayoutChange }) {
   const [mode, setMode] = useState('lista'); // 'lista' | 'nuovo' | 'dettaglio'
   const [clienteId, setClienteId] = useState(null);
   const [statoEditId, setStatoEditId] = useState(null); // id preventivo in cambio stato
@@ -3685,6 +3704,9 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
   const [chatRigaTesto, setChatRigaTesto] = useState('');
   const [chatUltimaAzione, setChatUltimaAzione] = useState(null); // { tipo: 'trovato'|'creato', nome, prezzo }
   const [chatSalvando, setChatSalvando] = useState(false);
+  // Modo Rapido (default): chat + preferiti + carrello. Modalità completa resta un tocco via.
+  const [modoRapido, setModoRapido] = useState(true);
+  const [rapidoExtra, setRapidoExtra] = useState(null); // null | 'zona' | 'foto' | 'lavori' | 'manodopera' | 'catalogo'
   const [savedFlashId, setSavedFlashId] = useState(null);
   const [showPreview, setShowPreview] = useState(false);
   const [riordinaAperto, setRiordinaAperto] = useState(null); // null | 'materiale' | 'lavori' | 'riepilogo'
@@ -3803,6 +3825,17 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
   }, [presetDettaglioId]);
 
   const cliente = clienti.find(c => c.id === clienteId);
+
+  // Nasconde la bottom nav durante il costruttore (come un'app nativa a schermo intero)
+  // e lascia spazio al footer Totale/Anteprima quando c'è un cliente selezionato.
+  React.useEffect(() => {
+    if (!onLayoutChange) return;
+    onLayoutChange({
+      hideNav: mode === 'nuovo',
+      padComposer: mode === 'nuovo' && !!clienteId,
+    });
+    return () => onLayoutChange({ hideNav: false, padComposer: false });
+  }, [mode, clienteId, onLayoutChange]);
 
   const subtotaleMateriali = carrello.filter(i => i.kind === 'materiale').reduce((s, i) => s + i.prezzoUnitario * i.qty, 0);
   const subtotaleProdotti = carrello.filter(i => i.kind === 'prodotto').reduce((s, i) => s + i.prezzoUnitario * i.qty, 0);
@@ -3942,6 +3975,8 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
     setFotoCantiere([]);
     setClienteSearch('');
     setDiciture({});
+    setModoRapido(true);
+    setRapidoExtra(null);
     setMode('nuovo');
   };
 
@@ -4492,7 +4527,8 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
         <button
           type="button"
           onClick={startNuovo}
-          className="app-ripple lg:hidden fixed right-4 z-30 w-14 h-14 rounded-full bg-blue-600 text-white shadow-[0_4px_10px_rgba(37,99,235,0.4),0_2px_4px_rgba(0,0,0,0.15)] flex items-center justify-center active:scale-95 transition-transform bottom-[calc(5.25rem+env(safe-area-inset-bottom))]"
+          className="app-ripple lg:hidden fixed right-4 z-30 w-14 h-14 rounded-full bg-blue-600 text-white shadow-[0_4px_10px_rgba(37,99,235,0.4),0_2px_4px_rgba(0,0,0,0.15)] flex items-center justify-center active:scale-95 transition-transform"
+          style={{ bottom: 'calc(var(--nav-h) + 1rem)' }}
           aria-label="Nuovo preventivo"
         >
           <Plus className="w-6 h-6" />
@@ -4970,17 +5006,334 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
             }}
           />
         </div>
+      ) : modoRapido ? (
+        /* ========== MODO RAPIDO — Denis in <15 min ========== */
+        <div className="space-y-4 pb-2">
+          {/* Header cliente + toggle */}
+          <div className="app-card px-4 py-3.5 flex items-start gap-3">
+            <button
+              type="button"
+              onClick={() => { setClienteId(null); setRapidoExtra(null); }}
+              className="app-ripple mt-0.5 w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 shrink-0"
+              aria-label="Cambia cliente"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
+                  <Zap className="w-3 h-3" /> Rapido
+                </span>
+                {modificaId && <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full">Modifica</span>}
+              </div>
+              <p className="text-sm font-bold text-slate-900 mt-1 truncate">{cliente.nome}</p>
+              <p className="text-xs text-slate-400 truncate">{cliente.indirizzo}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setModoRapido(false)}
+              className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 shrink-0 pt-1"
+            >
+              Completa →
+            </button>
+          </div>
+
+          {/* Chat materiali — hero */}
+          <div className="app-card overflow-hidden">
+            <div className="px-4 pt-4 pb-2">
+              <p className="text-sm font-bold text-slate-900">Aggiungi materiale</p>
+              <p className="text-xs text-slate-400 mt-0.5">Scrivi e invia — come a voce. Es. <span className="font-medium text-slate-500">Valvola 1/2 - 18</span></p>
+            </div>
+            <div className="px-4 pb-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={chatRigaTesto}
+                  onChange={(e) => setChatRigaTesto(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && aggiungiRigaChat()}
+                  placeholder="Nome materiale…"
+                  disabled={chatSalvando}
+                  autoFocus
+                  className="flex-1 min-w-0 px-4 py-3.5 text-[16px] bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 disabled:opacity-60"
+                />
+                <button
+                  type="button"
+                  onClick={aggiungiRigaChat}
+                  disabled={!chatRigaTesto.trim() || chatSalvando}
+                  className="app-ripple shrink-0 w-14 h-14 rounded-2xl bg-[#10133a] hover:bg-[#1a1f4d] disabled:bg-slate-200 text-white flex items-center justify-center transition-colors shadow-lg shadow-slate-900/10"
+                >
+                  <Plus className="w-6 h-6" />
+                </button>
+              </div>
+              {chatUltimaAzione && (
+                <p className={`text-xs font-semibold mt-2.5 ${chatUltimaAzione.tipo === 'trovato' ? 'text-emerald-600' : 'text-blue-600'}`}>
+                  {chatUltimaAzione.tipo === 'trovato'
+                    ? `✓ ${chatUltimaAzione.nome} · ${chatUltimaAzione.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €`
+                    : `✓ Nuovo: ${chatUltimaAzione.nome} · ${chatUltimaAzione.prezzo.toLocaleString('it-IT', { minimumFractionDigits: 2 })} €`}
+                </p>
+              )}
+            </div>
+
+            {/* Preferiti / più usati */}
+            {prodottiPiuUsati.length > 0 && (
+              <div className="px-4 pb-4 border-t border-slate-50 pt-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2">Più usati</p>
+                <div className="flex gap-2 overflow-x-auto pb-0.5 -mx-1 px-1">
+                  {prodottiPiuUsati.map(p => {
+                    const isAdded = !!carrello.find(i => i.id === p.id);
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => toggleProdotto(p)}
+                        className={`app-ripple shrink-0 flex items-center gap-1.5 px-3.5 py-2.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${isAdded ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700 active:bg-slate-200'}`}
+                      >
+                        {isAdded ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                        {p.nome.length > 24 ? p.nome.slice(0, 24) + '…' : p.nome}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Carrello compatto */}
+          <div className="app-card overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+              <p className="text-sm font-bold text-slate-900">
+                Voci <span className="text-slate-400 font-semibold">({carrello.filter(i => i.kind !== 'trasferta').length})</span>
+              </p>
+              {carrello.length > 1 && (
+                <button type="button" onClick={() => setRiordinaAperto('riepilogo')} className="text-[11px] font-semibold text-blue-600">
+                  Riordina
+                </button>
+              )}
+            </div>
+            {carrello.filter(i => i.kind !== 'trasferta').length === 0 ? (
+              <p className="px-4 py-8 text-center text-sm text-slate-400">Nessuna voce ancora — scrivi sopra o tocca un preferito.</p>
+            ) : (
+              <div className="divide-y divide-slate-50">
+                {carrello.filter(i => i.kind !== 'trasferta').map(item => (
+                  <div key={item.id} className="px-4 py-3 flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-slate-900 truncate">{item.nome}</p>
+                      <p className="text-[11px] text-slate-400 truncate">{item.meta || item.kind}</p>
+                    </div>
+                    {item.kind === 'prodotto' && (
+                      <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-full px-1 py-1 shrink-0">
+                        <button type="button" onClick={() => aggiornaQtyProdotto(item.id, item.qty - 1)} className="app-ripple w-7 h-7 rounded-full bg-white text-slate-600 font-bold text-sm">−</button>
+                        <span className="w-7 text-center text-xs font-mono font-semibold text-slate-800">{item.qty}</span>
+                        <button type="button" onClick={() => aggiornaQtyProdotto(item.id, item.qty + 1)} className="app-ripple w-7 h-7 rounded-full bg-white text-slate-600 font-bold text-sm">+</button>
+                      </div>
+                    )}
+                    <span className="text-sm font-bold text-slate-900 shrink-0 w-16 text-right">{fmtEuro(Math.round(item.prezzoUnitario * item.qty))}</span>
+                    <button type="button" onClick={() => rimuoviVoce(item.id)} className="text-slate-300 hover:text-red-500 shrink-0"><X className="w-4 h-4" /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Extra collassabili — tutto il resto senza rumor */}
+          <div className="space-y-2">
+            {[
+              { id: 'zona', label: 'Zona / template rapidi' },
+              { id: 'manodopera', label: 'Manodopera e trasferta' },
+              { id: 'lavori', label: 'Voci di lavoro salvate' },
+              { id: 'catalogo', label: 'Sfoglia catalogo' },
+              { id: 'foto', label: `Foto cantiere${fotoCantiere.length ? ` (${fotoCantiere.length})` : ''}` },
+            ].map(sec => (
+              <div key={sec.id} className="app-card overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setRapidoExtra(rapidoExtra === sec.id ? null : sec.id)}
+                  className="app-ripple w-full px-4 py-3.5 flex items-center justify-between text-left"
+                >
+                  <span className="text-sm font-semibold text-slate-800">{sec.label}</span>
+                  <span className={`text-slate-400 text-lg leading-none transition-transform ${rapidoExtra === sec.id ? 'rotate-90' : ''}`}>›</span>
+                </button>
+                {rapidoExtra === sec.id && sec.id === 'zona' && (
+                  <div className="px-3 pb-4 border-t border-slate-50 pt-3 space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      {ZONE_AMBIENTI.map(function (z) {
+                        const Icon = z.Icon;
+                        const active = zonaAttiva === z.id;
+                        return (
+                          <button
+                            key={z.id}
+                            type="button"
+                            onClick={() => setZonaAttiva(z.id)}
+                            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-left text-xs font-semibold ${active ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700'}`}
+                          >
+                            <Icon className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">{z.nome}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {TEMPLATE_LAVORI.filter(t => t.zona === zonaAttiva).length > 0 && (
+                      <div className="flex flex-col gap-2">
+                        {TEMPLATE_LAVORI.filter(t => t.zona === zonaAttiva).map(t => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => applicaTemplate(t)}
+                            className="app-ripple flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-100"
+                          >
+                            <Plus className="w-3.5 h-3.5" /> {t.nome}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {rapidoExtra === sec.id && sec.id === 'manodopera' && (
+                  <div className="px-4 pb-4 border-t border-slate-50 pt-3 space-y-3">
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => setRincaroMode('percent')} className={`flex-1 py-2 rounded-lg text-xs font-bold ${rincaroMode === 'percent' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}>% sul materiale</button>
+                      <button type="button" onClick={() => setRincaroMode('ore')} className={`flex-1 py-2 rounded-lg text-xs font-bold ${rincaroMode === 'ore' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'}`}>Ore × tariffa</button>
+                    </div>
+                    {rincaroMode === 'percent' ? (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-600">Percentuale</span>
+                        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
+                          <input type="text" inputMode="decimal" value={rincaroPercent} onChange={(e) => setRincaroPercent(e.target.value)} className="w-12 bg-transparent text-right text-sm font-mono outline-none" />
+                          <span className="text-slate-400 text-xs">%</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-slate-600">Ore</span>
+                          <input type="text" inputMode="decimal" value={rincaroOre} onChange={(e) => setRincaroOre(e.target.value)} className="w-16 text-right text-sm font-mono bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none" />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-slate-600">€/ora</span>
+                          <input type="text" inputMode="decimal" value={rincaroTariffa} onChange={(e) => setRincaroTariffa(e.target.value)} className="w-16 text-right text-sm font-mono bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 outline-none" />
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+                      <span className="text-xs font-semibold text-slate-500">Manodopera</span>
+                      <span className="text-sm font-bold">{fmtEuro(Math.round(rincaroValore))}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm text-slate-600">Km A/R</span>
+                      <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
+                        <input type="text" inputMode="decimal" value={kmTrasferta} onChange={(e) => setKmTrasferta(e.target.value)} placeholder="0" className="w-14 bg-transparent text-right text-sm font-mono outline-none" />
+                        <span className="text-slate-400 text-xs">km</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-500">Trasferta</span>
+                      <span className="text-sm font-bold">{fmtEuro(Math.round(subtotaleTrasferta))}</span>
+                    </div>
+                  </div>
+                )}
+                {rapidoExtra === sec.id && sec.id === 'lavori' && (
+                  <div className="px-4 pb-4 border-t border-slate-50 pt-3 space-y-2 max-h-56 overflow-y-auto">
+                    {vociLavoro.slice(0, 20).map(v => (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => aggiungiVoceSalvata(v)}
+                        className="app-ripple w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-left"
+                      >
+                        <span className="text-sm font-medium text-slate-800 truncate">{v.nome}</span>
+                        <span className="text-xs font-bold text-blue-600 shrink-0">+ Aggiungi</span>
+                      </button>
+                    ))}
+                    {vociLavoro.length === 0 && <p className="text-xs text-slate-400 text-center py-3">Nessuna voce salvata.</p>}
+                    <button type="button" onClick={() => { setModoRapido(false); setShowNuovoLavoro(true); }} className="w-full text-xs font-semibold text-slate-500 py-2">
+                      + Nuova voce in modalità completa
+                    </button>
+                  </div>
+                )}
+                {rapidoExtra === sec.id && sec.id === 'catalogo' && (
+                  <div className="px-4 pb-4 border-t border-slate-50 pt-3 space-y-3">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        type="text"
+                        value={queryCatalogoPreventivo}
+                        onChange={(e) => setQueryCatalogoPreventivo(e.target.value)}
+                        placeholder="Cerca nel catalogo…"
+                        className="w-full pl-9 pr-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/30"
+                      />
+                    </div>
+                    <div className="max-h-52 overflow-y-auto divide-y divide-slate-50 border border-slate-100 rounded-xl">
+                      {(queryCatalogoPreventivo.trim()
+                        ? prodotti.filter(p => visibileInZona(p, zonaAttiva) && corrispondeRicerca([p.nome, p.codice, p.descrizione].join(' '), queryCatalogoPreventivo)).slice(0, 30)
+                        : prodottiPiuUsati
+                      ).map(p => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => toggleProdotto(p)}
+                          className="app-ripple w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-slate-50"
+                        >
+                          <span className="text-sm font-medium text-slate-800 truncate">{p.nome}</span>
+                          <span className="text-xs font-bold text-slate-500 shrink-0">{fmtEuro(p.prezzo)}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <button type="button" onClick={() => setModoRapido(false)} className="w-full text-xs font-semibold text-blue-600 py-1">
+                      Apri catalogo completo →
+                    </button>
+                  </div>
+                )}
+                {rapidoExtra === sec.id && sec.id === 'foto' && (
+                  <div className="px-4 pb-4 border-t border-slate-50 pt-3 space-y-3">
+                    <p className="text-xs text-slate-400">Opzionale — puoi aggiungere le foto anche dopo.</p>
+                    <div className="flex gap-2">
+                      <label className={`flex-1 flex items-center justify-center gap-1.5 border-2 border-dashed border-slate-300 text-slate-500 text-xs font-semibold py-3 rounded-xl cursor-pointer ${caricandoFoto ? 'opacity-60 pointer-events-none' : ''}`}>
+                        <ImagePlus className="w-4 h-4" /> Prima
+                        <input type="file" accept="image/*" multiple disabled={caricandoFoto} className="hidden" onChange={(e) => { if (e.target.files.length) gestisciFoto(e.target.files, 'prima'); e.target.value = ''; }} />
+                      </label>
+                      <label className={`flex-1 flex items-center justify-center gap-1.5 border-2 border-dashed border-slate-300 text-slate-500 text-xs font-semibold py-3 rounded-xl cursor-pointer ${caricandoFoto ? 'opacity-60 pointer-events-none' : ''}`}>
+                        <ImagePlus className="w-4 h-4" /> Dopo
+                        <input type="file" accept="image/*" multiple disabled={caricandoFoto} className="hidden" onChange={(e) => { if (e.target.files.length) gestisciFoto(e.target.files, 'dopo'); e.target.value = ''; }} />
+                      </label>
+                    </div>
+                    {fotoCantiere.length > 0 && (
+                      <div className="grid grid-cols-4 gap-2">
+                        {fotoCantiere.map(f => (
+                          <div key={f.id} className="relative aspect-square rounded-lg overflow-hidden border border-slate-200">
+                            <img src={f.url} alt="" className="w-full h-full object-cover" />
+                            <button type="button" onClick={() => rimuoviFoto(f.id)} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center">
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-5 items-start">
 
           <div className="space-y-5 min-w-0">
 
-            <div className="app-card px-5 py-4">
-              <p className="text-[11px] text-slate-400 uppercase tracking-wide font-semibold">Preventivo per</p>
-              <p className="text-sm font-bold text-slate-900 mt-0.5">{cliente.nome} · Cantiere: {cliente.indirizzo}</p>
-              {cliente.indirizzoResidenza && (
-                <p className="text-xs text-slate-500 mt-1">Residenza: {cliente.indirizzoResidenza}</p>
-              )}
+            <div className="app-card px-5 py-4 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] text-slate-400 uppercase tracking-wide font-semibold">Preventivo per</p>
+                <p className="text-sm font-bold text-slate-900 mt-0.5">{cliente.nome} · Cantiere: {cliente.indirizzo}</p>
+                {cliente.indirizzoResidenza && (
+                  <p className="text-xs text-slate-500 mt-1">Residenza: {cliente.indirizzoResidenza}</p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setModoRapido(true)}
+                className="app-ripple shrink-0 inline-flex items-center gap-1.5 text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-full"
+              >
+                <Zap className="w-3.5 h-3.5" /> Modo Rapido
+              </button>
             </div>
 
             {/* zona / ambiente attivo */}
@@ -5684,14 +6037,14 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
 
             <button
               onClick={() => setShowPreview(true)}
-              disabled={carrello.length === 0 || (!modificaId && fotoCantiere.length < 2)}
+              disabled={carrello.length === 0}
               className="app-ripple w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
             >
               <FileText className="w-4 h-4" />
               Anteprima Documento
             </button>
             {!modificaId && carrello.length > 0 && fotoCantiere.length < 2 && (
-              <p className="text-[11px] text-amber-600 text-center mt-2">Servono almeno 2 foto del cantiere per procedere</p>
+              <p className="text-[11px] text-slate-400 text-center mt-2">Foto cantiere consigliate (opzionali)</p>
             )}
           </div>
         </div>
@@ -5966,22 +6319,19 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
         />
       )}
 
-      {/* R6 "ultra rapido/wow": totale sempre visibile in fondo allo schermo
-          mentre si scorre — come il carrello di un'app seria (Amazon,
-          Glovo...), invece di dover scendere fino in fondo per vederlo.
-          Solo su telefono: su desktop il riepilogo è già sempre visibile
-          nella colonna laterale. */}
+      {/* Footer fisso Totale/Anteprima — sostituisce la bottom nav in modalità nuovo.
+          Un solo livello in fondo (niente sticky sopra la nav = niente "buco"). */}
       {cliente && !showPreview && !riordinaAperto && (
-        <div className="sticky z-30 -mx-4 sm:-mx-6 lg:hidden" style={{ bottom: 'var(--nav-h)' }}>
-          <div className="bg-white/95 backdrop-blur border-t border-slate-200 px-4 py-3 flex items-center justify-between gap-3 shadow-[0_-6px_16px_rgba(15,23,42,0.08)]">
-            <div>
+        <div className="app-composer-footer lg:hidden fixed inset-x-0 bottom-0 z-40">
+          <div className="px-4 py-3 flex items-center justify-between gap-3">
+            <div className="min-w-0">
               <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Totale</p>
-              <p className="text-lg font-bold text-slate-900">{fmtEuro(Math.round(totale))}</p>
+              <p className="text-xl font-bold text-slate-900 tracking-tight">{fmtEuro(Math.round(totale))}</p>
             </div>
             <button
               onClick={() => setShowPreview(true)}
-              disabled={carrello.length === 0 || (!modificaId && fotoCantiere.length < 2)}
-              className="app-ripple shrink-0 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-semibold px-5 py-2.5 rounded-full transition-colors flex items-center gap-2"
+              disabled={carrello.length === 0}
+              className="app-ripple shrink-0 bg-[#10133a] hover:bg-[#1a1f4d] disabled:bg-slate-200 disabled:text-slate-400 text-white text-sm font-semibold px-6 py-3 rounded-2xl transition-colors flex items-center gap-2 shadow-lg shadow-slate-900/15"
             >
               <FileText className="w-4 h-4" />
               Anteprima
@@ -6980,6 +7330,7 @@ function App() {
     return salvata && pageConfig[salvata] ? salvata : 'dashboard';
   });
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [layoutComposer, setLayoutComposer] = useState({ hideNav: false, padComposer: false });
   const codaOffline = useCodaOffline();
 
   useEffect(() => {
@@ -7214,6 +7565,7 @@ function App() {
     }
     setCurrentPage(page);
     setMobileNavOpen(false);
+    if (page !== 'preventivi') setLayoutComposer({ hideNav: false, padComposer: false });
     const main = document.querySelector('main.app-scroll');
     if (main) main.scrollTop = 0;
   };
@@ -7278,7 +7630,7 @@ function App() {
           </div>
         )}
 
-        <main className="flex-1 min-h-0 overflow-y-auto app-scroll app-main-pad-bottom">
+        <main className={`flex-1 min-h-0 overflow-y-auto app-scroll ${layoutComposer.padComposer ? 'app-main-pad-composer' : layoutComposer.hideNav ? 'app-main-pad-flat' : 'app-main-pad-bottom'}`}>
           <div key={currentPage} className="app-page">
         {currentPage === 'dashboard' && (
           <DashboardPage preventivi={preventivi} clienti={clienti} onVediTutti={() => setCurrentPage('preventivi')} />
@@ -7300,6 +7652,7 @@ function App() {
             onConsumePreset={() => setPresetClienteId(null)}
             presetDettaglioId={presetDettaglioId}
             onConsumePresetDettaglio={() => setPresetDettaglioId(null)}
+            onLayoutChange={setLayoutComposer}
           />
         )}
         {currentPage === 'clienti' && (
@@ -7318,7 +7671,9 @@ function App() {
           </div>
         </main>
 
-        <MobileBottomNav currentPage={currentPage} setCurrentPage={goToPage} />
+        {!layoutComposer.hideNav && (
+          <MobileBottomNav currentPage={currentPage} setCurrentPage={goToPage} />
+        )}
       </div>
     </div>
   );
