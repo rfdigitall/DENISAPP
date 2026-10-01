@@ -139,16 +139,17 @@ window.addEventListener('error', function (e) {
   // striscia bianca vuota sotto la barra di navigazione — quindi la
   // sommiamo SOLO quando l'app gira in quella modalità, mai in Safari.)
   var inStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-  // R9 (bug reale trovato con un video di Denis sul suo iPhone): quando si
-  // apre la tastiera, WebKit sposta il "visual viewport" rispetto al layout
-  // viewport per portare il campo sopra la tastiera — anche con
-  // position:fixed, che normalmente dovrebbe restare ancorato. Il vecchio
-  // fix (azzerare lo scroll a mano) combatteva contro questo spostamento e
-  // causava proprio il "salto, ba su ba giù" visto nel video. La correzione
-  // giusta non è annullare lo spostamento, ma SEGUIRLO: leggiamo
-  // visualViewport.offsetTop (di quanto si è spostato) e spostiamo il nostro
-  // contenitore fisso della stessa quantità, così resta sempre allineato,
-  // niente più stacco né spazio vuoto.
+  // R9/R11: un tentativo precedente qui usava "transform" sul body per
+  // seguire lo spostamento della tastiera — SBAGLIATO, e per il motivo
+  // esatto già scritto più sotto su questo stesso file (un transform crea
+  // un nuovo containing block e stacca TUTTI gli elementi position:fixed
+  // annidati, che si ancorano al body invece che allo schermo). Infatti ha
+  // causato danni reali visti da Denis dal vivo: la barra di navigazione in
+  // basso spariva/si spostava, e appariva uno spazio vuoto in alto a
+  // intermittenza. Tolto del tutto. Spostare "top" invece di usare
+  // "transform" ottiene lo stesso risultato (seguire lo spostamento della
+  // tastiera) SENZA creare un containing block nuovo — su un elemento già
+  // position:fixed, cambiare top/left/right non ha questo effetto.
   var set = function () {
     var h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
     if (inStandalone) {
@@ -157,7 +158,7 @@ window.addEventListener('error', function (e) {
     }
     document.documentElement.style.setProperty('--app-height', Math.round(h) + 'px');
     var offset = window.visualViewport ? window.visualViewport.offsetTop : 0;
-    document.body.style.transform = offset ? 'translateY(' + Math.round(offset) + 'px)' : '';
+    document.body.style.top = offset ? Math.round(offset) + 'px' : '';
   };
   set();
   window.addEventListener('resize', set);
@@ -215,7 +216,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202609301900';
+const APP_VERSION = '202610010900';
 
 // R10 (chiesto da Denis: dopo un push non si vedeva conferma che l'app si
 // fosse aggiornata) — TENTATIVO IN SOSPESO, non ancora funzionante: la
@@ -2142,7 +2143,7 @@ function MobileBottomNav({ currentPage, setCurrentPage }) {
   ];
 
   return (
-    <nav className="app-bottom-nav shrink-0 lg:hidden bg-white border-t border-slate-200">
+    <nav className="app-bottom-nav shrink-0 lg:hidden bg-white border-t border-slate-200 pb-1.5">
       <div className="grid grid-cols-4 h-14">
         {items.map(function (item) {
           const Icon = item.icon;
@@ -5382,7 +5383,7 @@ function PreventiviPage({ clienti, setClienti, clientiLoading, preventivi, setPr
             <div className="app-card overflow-hidden">
               <div className="px-5 py-3.5 border-b border-slate-100">
                 <p className="text-sm font-semibold text-slate-900">Scrivi un materiale</p>
-                <p className="text-xs text-slate-400 mt-0.5">Nome e prezzo, come lo diresti a voce — es. "Valvola a sfera 1/2 - 18"</p>
+                <p className="text-xs text-slate-400 mt-0.5">Nome e prezzo — es. "Valvola a sfera 1/2 - 18"</p>
               </div>
               <div className="p-4">
                 <div className="flex items-center gap-2">
@@ -7066,9 +7067,21 @@ function App() {
     return () => { document.removeEventListener('visibilitychange', onVisibilita); clearInterval(intervallo); };
   }, []);
 
-  // R10: la conferma "app aggiornata" vive dentro ToastHost stesso (vedi
-  // sopra) — evita la corsa fra due componenti che montano nello stesso
-  // istante.
+  // R10 (chiesto da Denis): conferma che l'app si è aggiornata — non un
+  // toast che sparisce da solo, un banner in alto come quello sopra
+  // ("versione nuova disponibile"), che resta finché non la chiudi tu con
+  // "OK". Stesso componente che lo mostra, nessun evento tra componenti
+  // diversi: i tentativi precedenti (ToastHost, flag di modulo) sparivano
+  // sempre nel vuoto per una causa mai isolata — qui il controllo e il
+  // render stanno nello stesso posto, come il banner sopra che funziona già.
+  const [appenaAggiornata, setAppenaAggiornata] = useState(false);
+  useEffect(() => {
+    try {
+      const vistaPrima = localStorage.getItem('ferari_ultima_versione_vista');
+      if (vistaPrima && vistaPrima !== APP_VERSION) setAppenaAggiornata(true);
+      localStorage.setItem('ferari_ultima_versione_vista', APP_VERSION);
+    } catch (err) { /* localStorage non disponibile — non blocca nulla */ }
+  }, []);
 
   // stato centrale: tutta l'app legge e scrive da qui
   const [clienti, setClienti] = useState([]);
@@ -7268,6 +7281,21 @@ function App() {
               className="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-md"
             >
               Aggiorna ora
+            </button>
+          </div>
+        )}
+
+        {appenaAggiornata && (
+          <div className="px-4 py-2 text-xs font-semibold flex items-center justify-between gap-2 shrink-0 bg-blue-50 text-blue-700">
+            <span className="flex items-center gap-1.5">
+              <Check className="w-3.5 h-3.5 shrink-0" />
+              App aggiornata all'ultima versione.
+            </span>
+            <button
+              onClick={() => setAppenaAggiornata(false)}
+              className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 rounded-md"
+            >
+              OK
             </button>
           </div>
         )}
