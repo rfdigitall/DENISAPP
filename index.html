@@ -274,7 +274,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202610161930';
+const APP_VERSION = '202610162015';
 
 // R10 (chiesto da Denis: dopo un push non si vedeva conferma che l'app si
 // fosse aggiornata) — TENTATIVO IN SOSPESO, non ancora funzionante: la
@@ -2520,6 +2520,524 @@ const TEMPLATE_LAVORI = [{
     nome: 'Fornitura N. 54 moduli ciechi per saturazione spazi vuoti',
     categoria: 'PREDISPOSIZIONI, ASSISTENZA ELETTRICA E FINITURE',
     prezzo: 90.00
+  }]
+}, {
+  id: 't4',
+  nome: 'Climatizzatore mono split',
+  zona: 'generico',
+  materiali: [{
+    nome: 'Condizionatore Climatizzatore Daikin Monosplit Inverter Serie Sensira FTXF25F 9000 BTU R-32 Wi-Fi Integrato',
+    categoria: 'Riscaldamento e clima',
+    unita: 'pz',
+    prezzo: 589,
+    qty: 1
+  }, {
+    nome: 'Staffa supporto per condizionatori da 7000 a 12000 BTU mm 350x380x800 (no brand)',
+    categoria: 'Riscaldamento e clima',
+    unita: 'pz',
+    prezzo: 22,
+    qty: 1
+  }, {
+    nome: 'Cavo H05VV-F 300/500V 3G sezione 2,5mm² colore bianco matassa da 150 m vendita metro lineare',
+    categoria: 'Elettrico',
+    unita: 'm',
+    prezzo: 3.90,
+    qty: 25
+  }, {
+    nome: 'Kit minicanale con 6 accessori da 25x18 mm curva angoli terminale derivazione coprigiunzione',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 6.40,
+    qty: 2
+  }],
+  lavori: [{
+    nome: 'Esecuzione di fori passanti su muratura per il transito e l’alloggiamento delle tubazioni del gas refrigerante dirette alla postazione esterna.',
+    categoria: 'INSTALLAZIONE E COLLEGAMENTO IMPIANTO DI CLIMATIZZAZIONE',
+    prezzo: 0
+  }, {
+    nome: 'Fornitura e posa in opera di canalizzazione esterna a vista per il contenimento, la protezione e il passaggio delle tubazioni refrigeranti e delle linee elettriche di collegamento, con cavo multipolare di comunicazione tra split e macchina esterna e linea elettrica dedicata per l’alimentazione.',
+    categoria: 'INSTALLAZIONE E COLLEGAMENTO IMPIANTO DI CLIMATIZZAZIONE',
+    prezzo: 0
+  }, {
+    nome: 'Installazione e fissaggio a regola d’arte dello staffaggio di supporto per la macchina esterna e fissaggio a parete dell’unità interna tramite apposita staffa.',
+    categoria: 'INSTALLAZIONE E COLLEGAMENTO IMPIANTO DI CLIMATIZZAZIONE',
+    prezzo: 0
+  }, {
+    nome: 'Posa e collegamento delle tubazioni refrigeranti tra unità interna ed esterna e cablaggio elettrico completo dei circuiti di alimentazione e controllo.',
+    categoria: 'INSTALLAZIONE E COLLEGAMENTO IMPIANTO DI CLIMATIZZAZIONE',
+    prezzo: 0
+  }, {
+    nome: 'Prova di tenuta dell’impianto sotto pressione e collaudo finale con verifica del corretto funzionamento del sistema.',
+    categoria: 'INSTALLAZIONE E COLLEGAMENTO IMPIANTO DI CLIMATIZZAZIONE',
+    prezzo: 0
+  }]
+}, {
+  id: 't5',
+  nome: 'Climatizzatore dual split',
+  zona: 'generico',
+  materiali: [{
+    nome: 'Condizionatore Climatizzatore Daikin Dual Split Inverter R-32 Serie Sensira 9000+12000 Con 2MXF40A Wi-Fi Integrato 9+12',
+    categoria: 'Riscaldamento e clima',
+    unita: 'pz',
+    prezzo: 1443,
+    qty: 1
+  }, {
+    nome: 'Staffa supporto per condizionatori da 18000 a 24000 BTU mm 350x480x800 (no brand)',
+    categoria: 'Riscaldamento e clima',
+    unita: 'pz',
+    prezzo: 29,
+    qty: 1
+  }, {
+    nome: 'Cavo H05VV-F 300/500V 3G sezione 2,5mm² colore bianco matassa da 150 m vendita metro lineare',
+    categoria: 'Elettrico',
+    unita: 'm',
+    prezzo: 3.90,
+    qty: 40
+  }, {
+    nome: 'Kit minicanale con 6 accessori da 25x18 mm curva angoli terminale derivazione coprigiunzione',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 6.40,
+    qty: 3
+  }],
+  lavori: [{
+    nome: 'Esecuzione di fori passanti su muratura per il transito e l’alloggiamento delle tubazioni del gas refrigerante dirette alla postazione esterna.',
+    categoria: 'INSTALLAZIONE E COLLEGAMENTO IMPIANTO DI CLIMATIZZAZIONE',
+    prezzo: 0
+  }, {
+    nome: 'Fornitura e posa in opera di canalizzazione esterna a vista per il contenimento, la protezione e il passaggio delle tubazioni refrigeranti e delle linee elettriche di collegamento, con cavo multipolare di comunicazione tra gli split e la macchina esterna e linea elettrica dedicata per l’alimentazione.',
+    categoria: 'INSTALLAZIONE E COLLEGAMENTO IMPIANTO DI CLIMATIZZAZIONE',
+    prezzo: 0
+  }, {
+    nome: 'Installazione e fissaggio a regola d’arte dello staffaggio di supporto per la macchina esterna (singolo motore) e fissaggio a parete delle due unità interne tramite apposite staffe.',
+    categoria: 'INSTALLAZIONE E COLLEGAMENTO IMPIANTO DI CLIMATIZZAZIONE',
+    prezzo: 0
+  }, {
+    nome: 'Posa e collegamento di tutte le tubazioni refrigeranti tra le unità interne e l’unità esterna e cablaggio elettrico completo dei circuiti di alimentazione e controllo.',
+    categoria: 'INSTALLAZIONE E COLLEGAMENTO IMPIANTO DI CLIMATIZZAZIONE',
+    prezzo: 0
+  }, {
+    nome: 'Prova di tenuta dell’impianto sotto pressione e collaudo finale con verifica del corretto funzionamento del sistema.',
+    categoria: 'INSTALLAZIONE E COLLEGAMENTO IMPIANTO DI CLIMATIZZAZIONE',
+    prezzo: 0
+  }]
+}, {
+  id: 't6',
+  nome: 'Sostituzione boiler elettrico',
+  zona: 'generico',
+  materiali: [{
+    nome: 'Scaldabagno elettrico Ariston ad Accumulo Velis Pro 80 Doppio Serbatoio Cod. 3100915',
+    categoria: 'Riscaldamento e clima',
+    unita: 'pz',
+    prezzo: 267,
+    qty: 1
+  }, {
+    nome: 'Kit flessibili faid scaldabagno mf 1/2" con valvola incorporata lunghezza 35 cm 2pz',
+    categoria: 'Idraulica',
+    unita: 'pz',
+    prezzo: 14.20,
+    qty: 1
+  }, {
+    nome: 'Valvola a sfera per acqua enolgas serie atomic con leva mf 1/2 PN25',
+    categoria: 'Idraulica',
+    unita: 'pz',
+    prezzo: 4.18,
+    qty: 2
+  }, {
+    nome: 'Vaso espansione aquasystem riscaldamento e sanitario 8 l ø 200 mm attacco verticale m 3/4"',
+    categoria: 'Idraulica',
+    unita: 'pz',
+    prezzo: 24.80,
+    qty: 1
+  }, {
+    nome: 'Presa universale Vimar plana 2P+T 10/16A + schuko',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 9.65,
+    qty: 1
+  }, {
+    nome: 'Kit minicanale con 6 accessori da 25x18 mm curva angoli terminale derivazione coprigiunzione',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 6.40,
+    qty: 1
+  }],
+  lavori: [{
+    nome: 'Scollegamento e rimozione del vecchio scaldabagno, con smaltimento presso centro autorizzato.',
+    categoria: 'SMANTELLAMENTO E SMALTIMENTO',
+    prezzo: 0
+  }, {
+    nome: 'Fornitura e posa in opera di scaldabagno elettrico, con nuove valvole di intercettazione a sfera, kit flessibili di collegamento, vaso di espansione e filtro a polifosfati per la protezione anticalcare.',
+    categoria: 'OPERE IDRAULICHE E TERMOSANITARIE',
+    prezzo: 0
+  }, {
+    nome: 'Alimentazione boiler: predisposizione di linea elettrica dedicata a vista tramite canalina esterna, con scatola 503, presa Schuko e interruttore dedicato (0/1) per il comando diretto dell’apparecchio.',
+    categoria: 'PREDISPOSIZIONI, ASSISTENZA ELETTRICA E FINITURE',
+    prezzo: 0
+  }]
+}, {
+  id: 't7',
+  nome: 'Quadro elettrico generale',
+  zona: 'generico',
+  materiali: [{
+    nome: 'Centralino Bticino da incasso 12 moduli portello bianco cieco serie space IP40',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 24.90,
+    qty: 1
+  }, {
+    nome: 'Interruttore magnetotermico ABB differenziale 2P protetti 25A 4,5 ka curva c 0,03A',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 49.90,
+    qty: 1
+  }, {
+    nome: 'Interruttore magnetotermico tecnoline 1P+N 16A 4,5KA 1 modulo',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 4.90,
+    qty: 6
+  }, {
+    nome: 'Interruttore magnetotermico tecnoline 1P+N 10A 4,5KA 1 modulo',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 4.90,
+    qty: 2
+  }, {
+    nome: 'Lampada emergenza Vimar linea LED 1 modulo 2,5 ore 230V',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 55.50,
+    qty: 1
+  }],
+  lavori: [{
+    nome: 'Fornitura e posa in opera di centralino generale, comprensivo di cablaggio e morsettiere di ripartizione.',
+    categoria: 'REALIZZAZIONE QUADRO ELETTRICO GENERALE DI DISTRIBUZIONE',
+    prezzo: 0
+  }, {
+    nome: 'Installazione di interruttore generale magnetotermico differenziale (C25) per la protezione della linea di adduzione principale dell’abitazione.',
+    categoria: 'REALIZZAZIONE QUADRO ELETTRICO GENERALE DI DISTRIBUZIONE',
+    prezzo: 0
+  }, {
+    nome: 'Sezionamento delle linee: fornitura e montaggio di interruttori magnetotermici dedicati per linee prese, luci e utenze dedicate (forno, frigorifero, lavastoviglie, lavatrice).',
+    categoria: 'REALIZZAZIONE QUADRO ELETTRICO GENERALE DI DISTRIBUZIONE',
+    prezzo: 0
+  }, {
+    nome: 'Dotazioni di sicurezza: fornitura e posa in opera di modulo lampada di emergenza integrato nel quadro, con attivazione automatica in assenza di tensione di rete.',
+    categoria: 'REALIZZAZIONE QUADRO ELETTRICO GENERALE DI DISTRIBUZIONE',
+    prezzo: 0
+  }]
+}, {
+  id: 't8',
+  nome: 'Impianto elettrico a vista, stile vintage (per piano)',
+  zona: 'generico',
+  materiali: [{
+    nome: 'Placca ovale ceramica 125x81 mm bianca con interruttore deviatore 10A 250V per scatola 503',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 31,
+    qty: 10
+  }, {
+    nome: 'Presa ceramica bipasso 2P+T 10/16A 230V colore marrone',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 21.90,
+    qty: 20
+  }, {
+    nome: 'Cavo unipolare FS17 CPR 450/750 sezione 1x4 mmq colore marrone matassa 100 m',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 73.90,
+    qty: 1
+  }, {
+    nome: 'Cavo unipolare FS17 CPR 450/750 sezione 1x4 mmq colore blu matassa 100 m',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 73.90,
+    qty: 1
+  }, {
+    nome: 'Cavo unipolare FS17 CPR 450/750 sezione 1x4 mmq colore giallo / verde matassa 100 m',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 73.90,
+    qty: 1
+  }, {
+    nome: 'Cavo unipolare FS17 CPR 450/750 sezione 1x1,5 mmq colore marrone matassa 100 m',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 26.50,
+    qty: 1
+  }, {
+    nome: 'Cavo unipolare FS17 CPR 450/750 sezione 1x1,5 mmq colore blu matassa 100 m',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 26.50,
+    qty: 1
+  }, {
+    nome: 'Cavo unipolare FS17 CPR 450/750 sezione 1x1,5 mmq colore nero matassa 100 m',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 26.50,
+    qty: 1
+  }],
+  lavori: [{
+    nome: 'Posa in opera di canalizzazione a vista in tubazione PVC finitura rame, comprensiva di raccordi, curve e collari di fissaggio.',
+    categoria: 'IMPIANTO ELETTRICO A VISTA IN STILE VINTAGE',
+    prezzo: 0
+  }, {
+    nome: 'Fornitura e posa in opera di scatole di derivazione in stile per il sezionamento e la distribuzione delle dorsali del piano.',
+    categoria: 'IMPIANTO ELETTRICO A VISTA IN STILE VINTAGE',
+    prezzo: 0
+  }, {
+    nome: 'Fornitura e posa in opera di apparecchi di comando (interruttori e deviatori) e prese di corrente, montati su basi in porcellana/ceramica in stile vintage.',
+    categoria: 'IMPIANTO ELETTRICO A VISTA IN STILE VINTAGE',
+    prezzo: 0
+  }, {
+    nome: 'Cablaggio linea prese (forza motrice): posa di conduttori unipolari antifiamma sezione 4 mm².',
+    categoria: 'IMPIANTO ELETTRICO A VISTA IN STILE VINTAGE',
+    prezzo: 0
+  }, {
+    nome: 'Cablaggio linea luci: posa di conduttori unipolari antifiamma sezione 1,5 mm².',
+    categoria: 'IMPIANTO ELETTRICO A VISTA IN STILE VINTAGE',
+    prezzo: 0
+  }]
+}, {
+  id: 't9',
+  nome: 'Bagno: sanitari, zona doccia e boiler',
+  zona: 'bagno',
+  materiali: [{
+    nome: 'Vaso monoblocco con scarico a terra e sedile bianco - Malay',
+    categoria: 'Bagno',
+    unita: 'pz',
+    prezzo: 84,
+    qty: 1
+  }, {
+    nome: 'Mobile bagno sospeso 80 cm rovere deciso con lavabo integrato - Lion',
+    categoria: 'Bagno',
+    unita: 'pz',
+    prezzo: 120,
+    qty: 1
+  }, {
+    nome: 'Specchiera led doppia retroilluminata a luce calda - Nexil',
+    categoria: 'Bagno',
+    unita: 'pz',
+    prezzo: 157,
+    qty: 1
+  }, {
+    nome: 'Miscelatore lavabo in ottone cromo - Oasis',
+    categoria: 'Bagno',
+    unita: 'pz',
+    prezzo: 50,
+    qty: 1
+  }, {
+    nome: 'Piatto doccia 120x80 cm ultraslim riducibile grigio effetto pietra - Rok',
+    categoria: 'Bagno',
+    unita: 'pz',
+    prezzo: 103,
+    qty: 1
+  }, {
+    nome: 'Box doccia nicchia 100 cm battente con vetro trasparente e profilo cromo 195h - Nilo',
+    categoria: 'Bagno',
+    unita: 'pz',
+    prezzo: 153.85,
+    qty: 1
+  }, {
+    nome: 'Pannello doccia 4 vie in ottone cromato con doccino - Walker',
+    categoria: 'Bagno',
+    unita: 'pz',
+    prezzo: 207,
+    qty: 1
+  }, {
+    nome: 'Scaldabagno elettrico Ariston ad Accumulo Velis Pro 50 Doppio Serbatoio Cod. 3100914',
+    categoria: 'Riscaldamento e clima',
+    unita: 'pz',
+    prezzo: 252,
+    qty: 1
+  }, {
+    nome: 'Kit flessibili faid scaldabagno mf 1/2" con valvola incorporata lunghezza 35 cm 2pz',
+    categoria: 'Idraulica',
+    unita: 'pz',
+    prezzo: 14.20,
+    qty: 1
+  }, {
+    nome: 'Valvola a sfera per acqua enolgas serie atomic con leva mf 1/2 PN25',
+    categoria: 'Idraulica',
+    unita: 'pz',
+    prezzo: 4.18,
+    qty: 2
+  }],
+  lavori: [{
+    nome: 'Eliminazione bidet: chiusura definitiva degli scarichi e degli allacci preesistenti.',
+    categoria: 'MODIFICHE IMPIANTISTICHE E PREDISPOSIZIONI',
+    prezzo: 0
+  }, {
+    nome: 'Predisposizione doccetta: preparazione e adattamento dell’impianto idraulico a parete per l’installazione della nuova doccetta al posto del bidet.',
+    categoria: 'MODIFICHE IMPIANTISTICHE E PREDISPOSIZIONI',
+    prezzo: 0
+  }, {
+    nome: 'Adeguamento scarico doccia: modifica tecnica della linea di scarico a pavimento per consentire la corretta posa del nuovo piatto doccia ribassato.',
+    categoria: 'MODIFICHE IMPIANTISTICHE E PREDISPOSIZIONI',
+    prezzo: 0
+  }, {
+    nome: 'Scollegamento e rimozione del preesistente scaldabagno.',
+    categoria: 'SMANTELLAMENTO E SMALTIMENTO',
+    prezzo: 0
+  }, {
+    nome: 'Smontaggio sanitari: rimozione completa dei vecchi apparecchi (vaso WC, bidet e lavabo) e della relativa rubinetteria.',
+    categoria: 'SMANTELLAMENTO E SMALTIMENTO',
+    prezzo: 0
+  }, {
+    nome: 'Rimozione zona doccia: smontaggio del vecchio miscelatore e del piatto doccia esistente.',
+    categoria: 'SMANTELLAMENTO E SMALTIMENTO',
+    prezzo: 0
+  }, {
+    nome: 'Smaltimento: carico, trasporto e regolare conferimento di tutti i materiali di risulta presso centro autorizzato.',
+    categoria: 'SMANTELLAMENTO E SMALTIMENTO',
+    prezzo: 0
+  }, {
+    nome: 'Zona sanitario: posa e allaccio del nuovo vaso WC con scarico a pavimento e installazione della relativa doccetta a muro.',
+    categoria: 'INSTALLAZIONE E POSA IN OPERA',
+    prezzo: 0
+  }, {
+    nome: 'Zona lavabo: montaggio di mobile sospeso con miscelatore, installazione di specchiera con illuminazione a LED e allaccio idrico tramite nuovi flessibili e valvole d’arresto a sfera (acqua calda e fredda).',
+    categoria: 'INSTALLAZIONE E POSA IN OPERA',
+    prezzo: 0
+  }, {
+    nome: 'Zona doccia: posa in opera di piatto doccia ultra-slim effetto pietra, installazione di box doccia a nicchia in vetro temperato e montaggio di pannello doccia a 4 vie.',
+    categoria: 'INSTALLAZIONE E POSA IN OPERA',
+    prezzo: 0
+  }, {
+    nome: 'Produzione acqua calda: installazione di nuovo boiler elettrico, con valvole di intercettazione a sfera, kit flessibili di collegamento e filtro a polifosfati per la protezione anticalcare dell’apparecchio.',
+    categoria: 'INSTALLAZIONE E POSA IN OPERA',
+    prezzo: 0
+  }]
+}, {
+  id: 't10',
+  nome: 'Impianto elettrico laboratorio',
+  zona: 'generico',
+  materiali: [{
+    nome: 'Centralino Gewiss da parete 8 moduli colore bianco serie halogen free IP65',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 29,
+    qty: 1
+  }, {
+    nome: 'Interruttore magnetotermico ABB differenziale 2P protetti 32A 4,5 ka curva c 0,03A',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 49.90,
+    qty: 1
+  }, {
+    nome: 'Interruttore magnetotermico tecnoline 1P+N 10A 4,5KA 1 modulo',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 4.90,
+    qty: 1
+  }, {
+    nome: 'Interruttore magnetotermico Chint 2P 20A 6 ka curva c 2 moduli 230/400 v',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 6.90,
+    qty: 2
+  }, {
+    nome: 'Interruttore magnetotermico tecnoline 1P+N 16A 4,5KA 1 modulo',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 4.90,
+    qty: 1
+  }, {
+    nome: 'Presa industriale fanton argo 3P+N+T 32A 380-415V 6H IP54 cablaggio a vite',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 10.90,
+    qty: 2
+  }, {
+    nome: 'Presa industriale fanton argo 2P+T 16A 200-250V 6H IP54 cablaggio a vite',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 5.90,
+    qty: 2
+  }, {
+    nome: 'Cavo unipolare FS17 450/750 v sezione 1x6mm² marrone matassa da 300m vendita metro lineare',
+    categoria: 'Elettrico',
+    unita: 'm',
+    prezzo: 1.90,
+    qty: 120
+  }, {
+    nome: 'Cavo unipolare FS17 CPR 450/750 sezione 1x1,5 mmq colore marrone matassa 100 m',
+    categoria: 'Elettrico',
+    unita: 'pz',
+    prezzo: 26.50,
+    qty: 1
+  }],
+  lavori: [{
+    nome: 'Fornitura e posa di quadro elettrico di distribuzione secondario dedicato.',
+    categoria: 'REALIZZAZIONE IMPIANTO ELETTRICO LABORATORIO',
+    prezzo: 0
+  }, {
+    nome: 'Allestimento quadro con interruttore generale magnetotermico differenziale (C32), interruttore linea illuminazione (C10), interruttori prese industriali 400V (C20) e 230V (C20) e interruttore prese standard (C16).',
+    categoria: 'REALIZZAZIONE IMPIANTO ELETTRICO LABORATORIO',
+    prezzo: 0
+  }, {
+    nome: 'Posa in opera di canalizzazione a vista in tubazione rigida in PVC bianco.',
+    categoria: 'REALIZZAZIONE IMPIANTO ELETTRICO LABORATORIO',
+    prezzo: 0
+  }, {
+    nome: 'Cablaggio linee prese (industriali e standard) con conduttori unipolari antifiamma sezione 6 mm² e linea luci con sezione 1,5 mm².',
+    categoria: 'REALIZZAZIONE IMPIANTO ELETTRICO LABORATORIO',
+    prezzo: 0
+  }]
+}, {
+  id: 't11',
+  nome: 'Stufa a legna canalizzata e impianto fumi',
+  zona: 'generico',
+  materiali: [],
+  lavori: [{
+    nome: 'Posa in opera di stufa a legna canalizzata, con potenza termica superiore a 23 kW.',
+    categoria: 'INSTALLAZIONE STUFA A LEGNA CANALIZZATA E IMPIANTO FUMI',
+    prezzo: 0
+  }, {
+    nome: 'Sistema fumario: realizzazione di un nuovo sistema di scarico fumi a tetto tramite fornitura e installazione di tubazione dedicata.',
+    categoria: 'INSTALLAZIONE STUFA A LEGNA CANALIZZATA E IMPIANTO FUMI',
+    prezzo: 0
+  }, {
+    nome: 'Terminale di scarico: installazione di comignolo con sistema antivento per garantire un corretto tiraggio in ogni condizione atmosferica.',
+    categoria: 'INSTALLAZIONE STUFA A LEGNA CANALIZZATA E IMPIANTO FUMI',
+    prezzo: 0
+  }, {
+    nome: 'Impianto di canalizzazione aria calda: posa di tubazione per la distribuzione dell’aria calda negli ambienti designati, con ventilazione fino a un massimo di 4 diramazioni.',
+    categoria: 'INSTALLAZIONE STUFA A LEGNA CANALIZZATA E IMPIANTO FUMI',
+    prezzo: 0
+  }, {
+    nome: 'Installazione di bocchette terminali regolabili per la gestione personalizzata del flusso d’aria in ogni stanza.',
+    categoria: 'INSTALLAZIONE STUFA A LEGNA CANALIZZATA E IMPIANTO FUMI',
+    prezzo: 0
+  }, {
+    nome: 'Consulenza e direzione tecnica: intervento di un ingegnere specializzato per la supervisione dei lavori, a garanzia del corretto dimensionamento e del totale adeguamento tecnico e normativo dell’impianto.',
+    categoria: 'INSTALLAZIONE STUFA A LEGNA CANALIZZATA E IMPIANTO FUMI',
+    prezzo: 0
+  }]
+}, {
+  id: 't12',
+  nome: 'Smantellamento e smaltimento',
+  zona: 'generico',
+  materiali: [],
+  lavori: [{
+    nome: 'Rimozione dei radiatori preesistenti.',
+    categoria: 'SMANTELLAMENTO E SMALTIMENTO',
+    prezzo: 0
+  }, {
+    nome: 'Rimozione di vecchio termostato non più in uso.',
+    categoria: 'SMANTELLAMENTO E SMALTIMENTO',
+    prezzo: 0
+  }, {
+    nome: 'Smontaggio dei vecchi sanitari e della relativa rubinetteria.',
+    categoria: 'SMANTELLAMENTO E SMALTIMENTO',
+    prezzo: 0
+  }, {
+    nome: 'Smaltimento: carico, trasporto e regolare conferimento di tutti i materiali di risulta presso centro autorizzato.',
+    categoria: 'SMANTELLAMENTO E SMALTIMENTO',
+    prezzo: 0
   }]
 }];
 
@@ -5904,6 +6422,7 @@ function PreventiviPage({
       const prodEsistente = prodotti.find(p => p.nome === tm.nome);
       let prodId = prodEsistente?.id;
       let unitaUsata = prodEsistente?.unita || tm.unita;
+      const prezzoUsato = prodEsistente ? prodEsistente.prezzo : tm.prezzo;
       if (!prodEsistente) {
         const {
           data,
@@ -5913,7 +6432,7 @@ function PreventiviPage({
           categoria: tm.categoria,
           sottocategoria: 'Generico',
           tier: 'Standard',
-          fornitore: 'Tecnomat',
+          fornitore: 'Generico',
           unita: tm.unita,
           prezzo: tm.prezzo
         })).select().single();
@@ -5943,10 +6462,10 @@ function PreventiviPage({
         return [...prev, {
           id: prodId,
           nome: tm.nome,
-          meta: unitaUsata === 'm' ? `${tm.qty} m × ${tm.prezzo.toLocaleString('it-IT', {
+          meta: unitaUsata === 'm' ? `${tm.qty} m × ${prezzoUsato.toLocaleString('it-IT', {
             minimumFractionDigits: 2
           })} €` : 'Standard',
-          prezzoUnitario: tm.prezzo,
+          prezzoUnitario: prezzoUsato,
           qty: tm.qty,
           kind: 'prodotto',
           zona: template.zona,
@@ -7465,7 +7984,7 @@ function PreventiviPage({
       className: "text-[16px] font-semibold text-[#111113]"
     }, t.nome), /*#__PURE__*/React.createElement("p", {
       className: "text-[13px] text-[#6E6E78] mt-0.5"
-    }, t.materiali.length, " materiali", (t.lavori || []).length ? ' · ' + t.lavori.length + ' voci di lavoro' : ''))), kitInCorso && /*#__PURE__*/React.createElement("p", {
+    }, [t.materiali.length ? t.materiali.length + ' materiali' : '', (t.lavori || []).length ? t.lavori.length + ' voci di lavoro' : ''].filter(Boolean).join(' · ')))), kitInCorso && /*#__PURE__*/React.createElement("p", {
       className: "text-center text-[13px] text-[#6E6E78] py-2"
     }, "Aggiungo le voci\u2026"))), sheet === 'nuovo' && /*#__PURE__*/React.createElement(FpvSheet, {
       title: "Nuovo prodotto",
