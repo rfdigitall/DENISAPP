@@ -274,7 +274,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202610201500';
+const APP_VERSION = '202610201600';
 
 // R10 (chiesto da Denis: dopo un push non si vedeva conferma che l'app si
 // fosse aggiornata) — TENTATIVO IN SOSPESO, non ancora funzionante: la
@@ -1078,6 +1078,44 @@ const LayoutDashboard = makeIcon('LayoutDashboard', [['rect', {
   width: 7,
   height: 5,
   rx: 1
+}]]);
+const LayoutGrid = makeIcon('LayoutGrid', [['rect', {
+  x: 3,
+  y: 3,
+  width: 7,
+  height: 7,
+  rx: 1.5
+}], ['rect', {
+  x: 14,
+  y: 3,
+  width: 7,
+  height: 7,
+  rx: 1.5
+}], ['rect', {
+  x: 3,
+  y: 14,
+  width: 7,
+  height: 7,
+  rx: 1.5
+}], ['rect', {
+  x: 14,
+  y: 14,
+  width: 7,
+  height: 7,
+  rx: 1.5
+}]]);
+const ListRows = makeIcon('ListRows', [['path', {
+  d: 'M8 6h13'
+}], ['path', {
+  d: 'M8 12h13'
+}], ['path', {
+  d: 'M8 18h13'
+}], ['path', {
+  d: 'M3 6h.01'
+}], ['path', {
+  d: 'M3 12h.01'
+}], ['path', {
+  d: 'M3 18h.01'
 }]]);
 const Copy = makeIcon('Copy', [['rect', {
   x: 9,
@@ -5523,6 +5561,108 @@ function FpvScheletroRighe({
     className: "w-12 h-4 rounded bg-[#EDEDF1]"
   }))));
 }
+
+// preferenze di come si guarda il catalogo (lista o galleria, ordine): si ricordano sul dispositivo
+const PREFERENZE_CATALOGO = 'ferari_catalogo_vista';
+const ORDINI_CATALOGO = ['nome', 'prezzo-asc', 'prezzo-desc', 'foto'];
+function leggiPreferenzeCatalogo() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PREFERENZE_CATALOGO) || '{}');
+    return {
+      vista: p.vista === 'galleria' ? 'galleria' : 'lista',
+      ordine: ORDINI_CATALOGO.includes(p.ordine) ? p.ordine : 'nome'
+    };
+  } catch (e) {
+    return {
+      vista: 'lista',
+      ordine: 'nome'
+    };
+  }
+}
+function salvaPreferenzeCatalogo(p) {
+  try {
+    localStorage.setItem(PREFERENZE_CATALOGO, JSON.stringify(p));
+  } catch (e) {/* senza memoria locale funziona lo stesso */}
+}
+
+// fasce di prezzo: nei dati sono "Standard / Premium / Lusso" (calcolate sul prezzo dentro ogni categoria)
+const FASCE_PREZZO = [{
+  id: 'Standard',
+  etichetta: 'Economici'
+}, {
+  id: 'Premium',
+  etichetta: 'Fascia media'
+}, {
+  id: 'Lusso',
+  etichetta: 'Fascia alta'
+}];
+
+// una scheda della galleria: foto grande, nome, prezzo e il tasto + (o le quantità)
+function FpvSchedaProdotto({
+  p,
+  qty,
+  modo,
+  onAggiungi,
+  onCambiaQty,
+  onApri
+}) {
+  const Icona = iconaCategoria(p.categoria);
+  const unita = p.unita && p.unita !== 'pz' ? ' / ' + fpvUnitaBreve(p.unita) : '';
+  const apriFoto = () => mostraFotoGrande(p, modo === 'scelta' ? () => onAggiungi(p) : null);
+  return /*#__PURE__*/React.createElement("div", {
+    className: "bg-white border border-[#E6E6EB] rounded-[20px] overflow-hidden flex flex-col shadow-[0_1px_2px_rgba(17,17,19,0.03)]"
+  }, p.fotoUrl ? /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: apriFoto,
+    "aria-label": 'Ingrandisci la foto di ' + p.nome,
+    className: "block w-full aspect-square bg-[#F5F5F7] active:opacity-80"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: p.fotoUrl,
+    alt: "",
+    loading: "lazy",
+    decoding: "async",
+    className: "w-full h-full object-contain bg-white"
+  })) : /*#__PURE__*/React.createElement("div", {
+    className: "w-full aspect-square bg-[#F5F5F7] text-[#B8B8C2] flex items-center justify-center"
+  }, /*#__PURE__*/React.createElement(Icona, {
+    className: "w-9 h-9"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "p-3 flex-1 flex flex-col"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: modo === 'gestione' ? () => onApri(p) : p.fotoUrl ? apriFoto : undefined,
+    className: "text-left min-w-0 flex-1 active:opacity-70"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "block text-[13.5px] font-semibold text-[#111113] leading-snug line-clamp-3"
+  }, p.nome), /*#__PURE__*/React.createElement("span", {
+    className: "block text-[11.5px] text-[#8E8E98] mt-1 truncate"
+  }, [p.fornitore, p.codice].filter(Boolean).join(' · '))), /*#__PURE__*/React.createElement("div", {
+    className: "mt-2 flex items-center justify-between gap-2"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "text-[16px] font-bold tabular-nums text-[#111113]"
+  }, fmtEuro2(p.prezzo), /*#__PURE__*/React.createElement("span", {
+    className: "text-[11.5px] font-medium text-[#8E8E98]"
+  }, unita)), modo === 'scelta' ? qty > 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center rounded-full bg-[#111113] text-white h-9 shrink-0"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    "aria-label": "Meno",
+    onClick: () => onCambiaQty(p, qty - 1),
+    className: "w-8 h-9 text-[19px] leading-none flex items-center justify-center active:opacity-60"
+  }, "\u2212"), /*#__PURE__*/React.createElement("span", {
+    className: "min-w-[1.2rem] text-center text-[13.5px] font-semibold tabular-nums"
+  }, fmtQtaBreve(qty)), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    "aria-label": "Pi\xF9",
+    onClick: () => onCambiaQty(p, qty + 1),
+    className: "w-8 h-9 text-[19px] leading-none flex items-center justify-center active:opacity-60"
+  }, "+")) : /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    "aria-label": 'Aggiungi ' + p.nome,
+    onClick: () => onAggiungi(p),
+    className: "w-9 h-9 shrink-0 rounded-full bg-[#111113] text-white text-[20px] leading-none flex items-center justify-center active:opacity-70"
+  }, "+") : null)));
+}
 function FpvCatalogo({
   prodotti,
   caricamento,
@@ -5579,9 +5719,55 @@ function FpvCatalogo({
     const l = sub === null ? baseCat : baseCat.filter(p => (p.sottocategoria || 'Generico') === sub);
     return [...l].sort((a, b) => a.nome.localeCompare(b.nome));
   }, [cerca, risultati, baseCat, sub]);
+
+  // --- ordine, fasce di prezzo e vista a galleria (per mostrare i prodotti a un cliente) ---
+  const [vista, setVista] = useState(() => leggiPreferenzeCatalogo().vista);
+  const [ordine, setOrdine] = useState(() => leggiPreferenzeCatalogo().ordine);
+  const [fasce, setFasce] = useState([]); // sottoinsieme di Standard / Premium / Lusso (vuoto = tutte)
+  const [prezzoDa, setPrezzoDa] = useState('');
+  const [prezzoA, setPrezzoA] = useState('');
+  const [mostraPrezzo, setMostraPrezzo] = useState(false);
+  const [soloFoto, setSoloFoto] = useState(false);
+  const cambiaVista = v => {
+    setVista(v);
+    salvaPreferenzeCatalogo({
+      vista: v,
+      ordine
+    });
+  };
+  const cambiaOrdine = o => {
+    setOrdine(o);
+    salvaPreferenzeCatalogo({
+      vista,
+      ordine: o
+    });
+  };
+  const numPrezzo = s => {
+    const v = parseFloat(String(s).replace(',', '.'));
+    return isNaN(v) ? null : v;
+  };
+  const pDa = numPrezzo(prezzoDa),
+    pA = numPrezzo(prezzoA);
+  const filtriAttivi = fasce.length > 0 || pDa !== null || pA !== null || soloFoto;
+  const azzeraFiltri = () => {
+    setFasce([]);
+    setPrezzoDa('');
+    setPrezzoA('');
+    setSoloFoto(false);
+    setMostraPrezzo(false);
+  };
+  const listaVista = React.useMemo(() => {
+    let l = lista;
+    if (fasce.length) l = l.filter(p => fasce.includes(p.tier));
+    if (pDa !== null) l = l.filter(p => p.prezzo >= pDa);
+    if (pA !== null) l = l.filter(p => p.prezzo <= pA);
+    if (soloFoto) l = l.filter(p => p.fotoUrl);
+    if (ordine === 'prezzo-asc') l = [...l].sort((a, b) => a.prezzo - b.prezzo || a.nome.localeCompare(b.nome));else if (ordine === 'prezzo-desc') l = [...l].sort((a, b) => b.prezzo - a.prezzo || a.nome.localeCompare(b.nome));else if (ordine === 'foto') l = [...l].sort((a, b) => (b.fotoUrl ? 1 : 0) - (a.fotoUrl ? 1 : 0));
+    return l;
+  }, [lista, fasce, pDa, pA, soloFoto, ordine]);
   useEffect(() => {
     setMostra(60);
-  }, [cerca, qDiff, cat, forn, sub]);
+  }, [cerca, qDiff, cat, forn, sub, fasce, pDa, pA, soloFoto, ordine, vista]);
   const fornitori = ['Tutti', ...FORNITORI_CATALOGO];
   const IconaCat = iconaCategoria(cat);
 
@@ -5748,9 +5934,93 @@ function FpvCatalogo({
     className: "text-[#8E8E98] font-medium"
   }, "\xB7 ", sub)), cerca && /*#__PURE__*/React.createElement("p", {
     className: "text-[12.5px] font-medium text-[#6E6E78] px-1 mb-2"
-  }, lista.length === 0 ? 'Nessun risultato' : lista.length === 1 ? '1 risultato' : lista.length + ' risultati', " in tutto il catalogo"), lista.length > 0 ? /*#__PURE__*/React.createElement("div", {
-    className: "bg-white border border-[#E6E6EB] rounded-[22px] overflow-hidden divide-y divide-[#EDEDF1] shadow-[0_1px_2px_rgba(17,17,19,0.03)]"
-  }, lista.slice(0, mostra).map(p => /*#__PURE__*/React.createElement(FpvRigaProdotto, {
+  }, listaVista.length === 0 ? 'Nessun risultato' : listaVista.length === 1 ? '1 risultato' : listaVista.length + ' risultati', " in tutto il catalogo"), lista.length > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "mb-3 space-y-2"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "relative flex-1 min-w-0"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "sr-only"
+  }, "Ordina per"), /*#__PURE__*/React.createElement("select", {
+    value: ordine,
+    onChange: e => cambiaOrdine(e.target.value),
+    className: "w-full h-10 pl-3.5 pr-9 rounded-full bg-white border border-[#E6E6EB] text-[13.5px] font-semibold text-[#111113] appearance-none outline-none"
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "nome"
+  }, cerca ? 'Ordine: più pertinenti' : 'Ordine: nome, A–Z'), /*#__PURE__*/React.createElement("option", {
+    value: "prezzo-asc"
+  }, "Ordine: prezzo dal pi\xF9 basso"), /*#__PURE__*/React.createElement("option", {
+    value: "prezzo-desc"
+  }, "Ordine: prezzo dal pi\xF9 alto"), /*#__PURE__*/React.createElement("option", {
+    value: "foto"
+  }, "Ordine: con foto per primi")), /*#__PURE__*/React.createElement(ChevronDown, {
+    className: "pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#6E6E78]"
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "flex shrink-0 items-center rounded-full bg-[#E6E6EB] p-0.5 h-10",
+    role: "group",
+    "aria-label": "Vista"
+  }, [['lista', ListRows, 'Vista a elenco'], ['galleria', LayoutGrid, 'Vista a galleria con foto grandi']].map(([id, Ic, et]) => /*#__PURE__*/React.createElement("button", {
+    key: id,
+    type: "button",
+    "aria-label": et,
+    "aria-pressed": vista === id,
+    onClick: () => cambiaVista(id),
+    className: 'w-10 h-9 rounded-full flex items-center justify-center ' + (vista === id ? 'bg-white text-[#111113] shadow-sm' : 'text-[#6E6E78]')
+  }, /*#__PURE__*/React.createElement(Ic, {
+    className: "w-[18px] h-[18px]"
+  }))))), /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-1.5 overflow-x-auto chips-scroll -mx-4 px-4"
+  }, FASCE_PREZZO.map(f => {
+    const on = fasce.includes(f.id);
+    return /*#__PURE__*/React.createElement("button", {
+      key: f.id,
+      type: "button",
+      "aria-pressed": on,
+      onClick: () => setFasce(prev => on ? prev.filter(x => x !== f.id) : [...prev, f.id]),
+      className: 'shrink-0 h-9 px-3.5 rounded-full text-[13px] font-semibold ' + (on ? 'bg-[#111113] text-white' : 'bg-white border border-[#E6E6EB] text-[#111113]')
+    }, f.etichetta);
+  }), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    "aria-pressed": soloFoto,
+    onClick: () => setSoloFoto(v => !v),
+    className: 'shrink-0 h-9 px-3.5 rounded-full text-[13px] font-semibold ' + (soloFoto ? 'bg-[#111113] text-white' : 'bg-white border border-[#E6E6EB] text-[#111113]')
+  }, "Solo con foto"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    "aria-pressed": mostraPrezzo || pDa !== null || pA !== null,
+    onClick: () => setMostraPrezzo(v => !v),
+    className: 'shrink-0 h-9 px-3.5 rounded-full text-[13px] font-semibold ' + (pDa !== null || pA !== null ? 'bg-[#111113] text-white' : 'bg-white border border-[#E6E6EB] text-[#111113]')
+  }, pDa !== null || pA !== null ? 'Prezzo: ' + (pDa !== null ? pDa : '0') + ' – ' + (pA !== null ? pA : '∞') + ' €' : 'Prezzo…'), filtriAttivi && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: azzeraFiltri,
+    className: "shrink-0 h-9 px-3 text-[13px] font-semibold text-[#0071E3]"
+  }, "Azzera filtri")), mostraPrezzo && /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    inputMode: "decimal",
+    value: prezzoDa,
+    onChange: e => setPrezzoDa(e.target.value.replace(/[^\d.,]/g, '')),
+    placeholder: "Da (\u20AC)",
+    "aria-label": "Prezzo minimo",
+    className: "flex-1 min-w-0 h-10 px-3.5 rounded-full bg-white border border-[#E6E6EB] outline-none text-[16px] text-[#111113]"
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "text-[#8E8E98]"
+  }, "\u2013"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    inputMode: "decimal",
+    value: prezzoA,
+    onChange: e => setPrezzoA(e.target.value.replace(/[^\d.,]/g, '')),
+    placeholder: "A (\u20AC)",
+    "aria-label": "Prezzo massimo",
+    className: "flex-1 min-w-0 h-10 px-3.5 rounded-full bg-white border border-[#E6E6EB] outline-none text-[16px] text-[#111113]"
+  })), !cerca && /*#__PURE__*/React.createElement("p", {
+    className: "text-[12.5px] font-medium text-[#6E6E78] px-1"
+  }, listaVista.length === 1 ? '1 prodotto' : listaVista.length.toLocaleString('it-IT') + ' prodotti', filtriAttivi && listaVista.length !== lista.length ? ' su ' + lista.length.toLocaleString('it-IT') : '')), listaVista.length > 0 ? /*#__PURE__*/React.createElement("div", {
+    className: vista === 'galleria' ? '' : 'bg-white border border-[#E6E6EB] rounded-[22px] overflow-hidden divide-y divide-[#EDEDF1] shadow-[0_1px_2px_rgba(17,17,19,0.03)]'
+  }, vista === 'galleria' ? /*#__PURE__*/React.createElement("div", {
+    className: "grid grid-cols-2 sm:grid-cols-3 gap-2.5"
+  }, listaVista.slice(0, mostra).map(p => /*#__PURE__*/React.createElement(FpvSchedaProdotto, {
     key: p.id,
     p: p,
     qty: qtyDi ? qtyDi(p) : 0,
@@ -5758,11 +6028,27 @@ function FpvCatalogo({
     onAggiungi: onAggiungi,
     onCambiaQty: onCambiaQty,
     onApri: onApri
-  })), lista.length > mostra && /*#__PURE__*/React.createElement("button", {
+  }))) : listaVista.slice(0, mostra).map(p => /*#__PURE__*/React.createElement(FpvRigaProdotto, {
+    key: p.id,
+    p: p,
+    qty: qtyDi ? qtyDi(p) : 0,
+    modo: modo,
+    onAggiungi: onAggiungi,
+    onCambiaQty: onCambiaQty,
+    onApri: onApri
+  })), listaVista.length > mostra && /*#__PURE__*/React.createElement("button", {
     type: "button",
     onClick: () => setMostra(m => m + 60),
-    className: "w-full h-12 text-[14px] font-semibold text-[#111113] active:bg-[#F5F5F7]"
-  }, "Mostra altri \xB7 ne restano ", lista.length - mostra)) : /*#__PURE__*/React.createElement("div", {
+    className: vista === 'galleria' ? 'mt-2.5 w-full h-12 rounded-[18px] bg-white border border-[#E6E6EB] text-[14px] font-semibold text-[#111113] active:bg-[#F5F5F7]' : 'w-full h-12 text-[14px] font-semibold text-[#111113] active:bg-[#F5F5F7]'
+  }, "Mostra altri \xB7 ne restano ", listaVista.length - mostra)) : lista.length > 0 ? /*#__PURE__*/React.createElement("div", {
+    className: "bg-white border border-[#E6E6EB] rounded-[22px] px-4 py-10 text-center"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-[14.5px] text-[#6E6E78]"
+  }, "Nessun prodotto con questi filtri."), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: azzeraFiltri,
+    className: "mt-4 inline-flex items-center gap-1.5 h-11 px-5 rounded-full bg-[#111113] text-white text-[14.5px] font-semibold active:opacity-80"
+  }, "Azzera i filtri")) : /*#__PURE__*/React.createElement("div", {
     className: "bg-white border border-[#E6E6EB] rounded-[22px] px-4 py-10 text-center"
   }, /*#__PURE__*/React.createElement("p", {
     className: "text-[14.5px] text-[#6E6E78]"
