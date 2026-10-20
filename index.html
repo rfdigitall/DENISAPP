@@ -274,7 +274,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202610201400';
+const APP_VERSION = '202610201500';
 
 // R10 (chiesto da Denis: dopo un push non si vedeva conferma che l'app si
 // fosse aggiornata) — TENTATIVO IN SOSPESO, non ancora funzionante: la
@@ -5553,12 +5553,25 @@ function FpvCatalogo({
     const m = {};
     baseCat.forEach(p => {
       const s = p.sottocategoria || 'Generico';
-      m[s] = (m[s] || 0) + 1;
+      const o = m[s] = m[s] || {
+        count: 0,
+        conFoto: []
+      };
+      o.count++;
+      if (p.fotoMini) o.conFoto.push(p);
     });
-    return Object.entries(m).sort((a, b) => a[0].localeCompare(b[0])).map(([nome, count]) => ({
-      nome,
-      count
-    }));
+    return Object.entries(m).sort((a, b) => a[0].localeCompare(b[0])).map(([nome, o]) => {
+      // fino a 4 foto della cartella, prese a intervalli regolari, per la copertina
+      const n = o.conFoto.length,
+        q = Math.min(4, n),
+        foto = [];
+      for (let i = 0; i < q; i++) foto.push(o.conFoto[Math.floor(i * n / q)].fotoMini);
+      return {
+        nome,
+        count: o.count,
+        foto
+      };
+    });
   }, [baseCat]);
   const mostraCartelle = !cerca && sub === null && cartelle.length > 1;
   const lista = React.useMemo(() => {
@@ -5692,7 +5705,19 @@ function FpvCatalogo({
     type: "button",
     onClick: () => setSub(c.nome),
     className: "w-full min-h-[104px] bg-white border border-[#E6E6EB] rounded-[20px] p-4 text-left flex flex-col justify-between active:bg-[#F5F5F7] shadow-[0_1px_2px_rgba(17,17,19,0.03)]"
-  }, /*#__PURE__*/React.createElement("span", {
+  }, c.foto.length > 0 ? /*#__PURE__*/React.createElement("span", {
+    className: "w-[60px] h-[60px] rounded-[14px] overflow-hidden grid grid-cols-2 gap-[2px] bg-[#EDEDF1] border border-[#EDEDF1]"
+  }, [0, 1, 2, 3].map(i => c.foto[i] ? /*#__PURE__*/React.createElement("img", {
+    key: i,
+    src: c.foto[i],
+    alt: "",
+    loading: "lazy",
+    decoding: "async",
+    className: "w-full h-full object-contain bg-white"
+  }) : /*#__PURE__*/React.createElement("span", {
+    key: i,
+    className: "bg-[#F5F5F7]"
+  }))) : /*#__PURE__*/React.createElement("span", {
     className: "w-9 h-9 rounded-[11px] bg-[#F0F0F4] text-[#111113] flex items-center justify-center"
   }, /*#__PURE__*/React.createElement(IconaCat, {
     className: "w-[18px] h-[18px]"
@@ -10163,19 +10188,39 @@ function App() {
   // di lasciare Denis bloccato sulla copia vecchia in cache del telefono.
   const [versioneNuovaDisponibile, setVersioneNuovaDisponibile] = useState(false);
   useEffect(() => {
-    const controllaVersione = async () => {
+    const controllaVersione = async aAvvio => {
       try {
         const res = await fetch(window.location.pathname, {
           cache: 'no-store'
         });
         const testo = await res.text();
         const match = testo.match(/APP_VERSION\s*=\s*'([^']+)'/);
-        if (match && match[1] !== APP_VERSION) setVersioneNuovaDisponibile(true);
+        if (match && match[1] !== APP_VERSION) {
+          // appena aperta l'app non c'è nessun lavoro da perdere: si ricarica da sola con la
+          // versione nuova (una volta sola per apertura, così non può girare a vuoto). Se
+          // invece l'app è già in uso, si avvisa soltanto con il banner.
+          let giaProvato = false;
+          try {
+            giaProvato = sessionStorage.getItem('ferari_auto_agg') === match[1];
+          } catch (e) {/* niente */}
+          if (aAvvio === true && !giaProvato && performance.now() < 10000) {
+            try {
+              sessionStorage.setItem('ferari_auto_agg', match[1]);
+            } catch (e) {/* niente */}
+            try {
+              const u = new URL(window.location.href);
+              u.searchParams.set('agg', match[1]);
+              window.location.replace(u.toString());
+              return;
+            } catch (e) {/* se non riesce, resta il banner */}
+          }
+          setVersioneNuovaDisponibile(true);
+        }
       } catch (err) {
         // offline o rete instabile — non è un errore da segnalare, si riprova dopo
       }
     };
-    controllaVersione();
+    controllaVersione(true);
     const onVisibilita = () => {
       if (document.visibilityState === 'visible') controllaVersione();
     };
