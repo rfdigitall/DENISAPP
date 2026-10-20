@@ -274,7 +274,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202610162015';
+const APP_VERSION = '202610200900';
 
 // R10 (chiesto da Denis: dopo un push non si vedeva conferma che l'app si
 // fosse aggiornata) — TENTATIVO IN SOSPESO, non ancora funzionante: la
@@ -483,7 +483,10 @@ function prodottoFromRow(row) {
     misuraAltezza: row.misura_altezza != null ? Number(row.misura_altezza) : null,
     schedaTecnicaUrl: row.scheda_tecnica_url || '',
     fotoPath: row.foto_path || null,
-    fotoUrl: row.foto_path ? sb.storage.from('prodotti-foto').getPublicUrl(row.foto_path).data.publicUrl : null
+    // foto grande (per mostrarla al cliente) e miniatura per le liste: le foto di
+    // catalogo ("cat/…") hanno una miniatura leggera accanto, "<nome>_t.webp"
+    fotoUrl: row.foto_path ? sb.storage.from('prodotti-foto').getPublicUrl(row.foto_path).data.publicUrl : null,
+    fotoMini: row.foto_path ? sb.storage.from('prodotti-foto').getPublicUrl(/^cat\/.+\.webp$/.test(row.foto_path) ? row.foto_path.replace(/\.webp$/, '_t.webp') : row.foto_path).data.publicUrl : null
   };
 }
 function prodottoToRow(p) {
@@ -1740,6 +1743,88 @@ function etichettaQuantita(item) {
   if (item.kind === 'lavoro') return 'Lavoro';
   return fmtQta(item.qty) + ' ' + unitaStampa(item.qty, item.unita);
 }
+
+// Le descrizioni prese dai siti dei fornitori arrivano a volte ripetendo il
+// nome del prodotto, seguite da un elenco di caratteristiche tecniche, o
+// tagliate a metà frase, o scritte tutte in maiuscolo. Nel documento per il
+// cliente si tiene solo la parte che si legge bene; quello che hanno scritto
+// a mano Denis e Deborah (senza questi difetti) resta com'è.
+const SIGLE_DESCRIZIONE = {
+  DC: 'DC',
+  AC: 'AC',
+  LED: 'LED',
+  GPL: 'GPL',
+  WIFI: 'WiFi',
+  IP: 'IP',
+  CPR: 'CPR',
+  USB: 'USB',
+  TV: 'TV',
+  KW: 'kW',
+  PDC: 'PDC',
+  COP: 'COP',
+  SCOP: 'SCOP'
+};
+const ENTITA_DESCRIZIONE = {
+  nbsp: ' ',
+  amp: '&',
+  quot: '"',
+  apos: "'",
+  rsquo: '’',
+  lsquo: '‘',
+  ndash: '-',
+  mdash: '-',
+  deg: '°',
+  euro: '€',
+  agrave: 'à',
+  egrave: 'è',
+  eacute: 'é',
+  igrave: 'ì',
+  ograve: 'ò',
+  ugrave: 'ù',
+  Agrave: 'À',
+  Egrave: 'È',
+  Eacute: 'É',
+  Oslash: 'Ø',
+  oslash: 'ø',
+  plusmn: '±',
+  times: '×'
+};
+function pulisciDescrizioneProdotto(nome, descrizione) {
+  // alcune descrizioni dei fornitori contengono codice HTML (<p>, <strong>…): si toglie
+  let d = String(descrizione || '').replace(/<\s*br\s*\/?>/gi, ' ').replace(/<\/(p|div|li|h\d|ul|ol|tr)>/gi, ' ').replace(/<[^>]*>/g, '').replace(/<[^>]*$/, '').replace(/&#(\d+);/g, (m, c) => String.fromCharCode(+c)).replace(/&([a-zA-Z]+);/g, (m, k) => ENTITA_DESCRIZIONE[k] !== undefined ? ENTITA_DESCRIZIONE[k] : m).replace(/\s+/g, ' ').trim();
+  if (!d) return '';
+  const n = String(nome || '').replace(/\s+/g, ' ').trim();
+  const eraTagliata = /(…|\.\.\.)\s*$/.test(d);
+  // 1) via il nome ripetuto all'inizio
+  if (n && d.toLowerCase().startsWith(n.toLowerCase())) d = d.slice(n.length).replace(/^[\s.\-–:|,]+/, '');
+  // 2) via l'elenco di caratteristiche tecniche (illeggibile in un documento)
+  const iCar = d.search(/Caratteristiche Tecniche/i);
+  if (iCar >= 0) d = d.slice(0, iCar).trim();
+  // 3) descrizione tagliata: si torna all'ultima frase o voce completa
+  d = d.replace(/(…|\.\.\.)\s*$/, '').trim();
+  if (eraTagliata && iCar < 0) {
+    const fineFrase = Math.max(d.lastIndexOf('. '), d.lastIndexOf('! '), d.lastIndexOf('? '));
+    const fineVoce = Math.max(d.lastIndexOf(' - '), d.lastIndexOf('; '), d.lastIndexOf(', '));
+    if (fineFrase >= 40) d = d.slice(0, fineFrase + 1);else if (fineVoce >= 40) d = d.slice(0, fineVoce);else {
+      const sp = d.lastIndexOf(' ');
+      if (sp > 40) d = d.slice(0, sp);
+    }
+  }
+  d = d.replace(/[\s,;:\-–|]+$/, '').trim();
+  // 4) tutto maiuscolo: si porta a frase normale, tenendo le sigle note
+  const lettere = d.replace(/[^A-Za-zÀ-ÿ]/g, '');
+  if (lettere.length > 40 && lettere.replace(/[^A-ZÀ-Ý]/g, '').length / lettere.length > 0.7) {
+    d = d.toLowerCase().replace(/(^|[.!?]\s+)([a-zà-ÿ])/g, (m, a, b) => a + b.toUpperCase()).replace(/\b[a-z]+\b/g, w => SIGLE_DESCRIZIONE[w.toUpperCase()] || w);
+  }
+  // 5) se dice quasi le stesse parole del nome, non aggiunge nulla
+  const parole = s => s.toLowerCase().match(/[a-zà-ÿ0-9]{3,}/g) || [];
+  const pd = parole(d);
+  if (pd.length) {
+    const inNome = new Set(parole(n));
+    if (pd.filter(w => inNome.has(w)).length / pd.length >= 0.75) return '';
+  }
+  return d.length >= 12 ? d : '';
+}
 function dicituraDefaultVoce(item) {
   if (item.kind === 'trasferta') {
     const kmTxt = (item.km || 0).toLocaleString('it-IT');
@@ -1778,8 +1863,8 @@ function dicituraDefaultVoce(item) {
       frase += `, misure ${item.misuraLunghezza || '–'}×${item.misuraProfondita || '–'}×${item.misuraAltezza || '–'} cm`;
     }
     frase += '.';
-    if (item.descrizioneProdotto && item.descrizioneProdotto.trim()) {
-      const desc = item.descrizioneProdotto.trim();
+    const desc = pulisciDescrizioneProdotto(item.nome, item.descrizioneProdotto);
+    if (desc) {
       frase += ' ' + (desc.endsWith('.') ? desc : desc + '.');
     }
     return smontaggio + frase;
@@ -2272,7 +2357,7 @@ const CATALOGO_STRUTTURA = {
     'Riscaldamento e clima': ['Caldaie a condensazione', 'Scaldabagni', 'Camini e stufe', 'Climatizzatori', 'Pompe di calore']
   },
   Deghi: {
-    'Bagno': ['Zona Doccia', 'Mobili da bagno', 'Sanitari', 'Lavabi', 'Rubinetteria', 'Specchiere', 'Termoarredo', 'Illuminazione (specchiere)']
+    'Bagno': ['Zona Doccia', 'Mobili da bagno', 'Sanitari', 'Lavabi', 'Rubinetteria', 'Specchiere', 'Termoarredo', 'Illuminazione (specchiere)', 'Vasche', 'Complementi']
   },
   // "Generico": per prodotti che non vengono da nessuno dei 3 fornitori
   // sopra (es. prodotti chimici come il Sentinel) — nessuna sottocategoria
@@ -2342,6 +2427,72 @@ function ZonaIcon({
     className: className || '',
     size: size || 16
   });
+}
+
+/* Kit personali — un preventivo già fatto diventa un kit da riusare.
+   Ogni kit è una riga della tabella "impostazioni" (chiave "kit_…", valore
+   JSON): niente tabelle nuove, e Denis e Deborah vedono gli stessi kit.
+   Stessa forma dei kit pronti (materiali + lavori), così si applicano con
+   lo stesso codice. I prezzi dei materiali si rileggono dal catalogo. */
+const KIT_PREFISSO = 'kit_';
+function leggiKitPersonali(impostazioni) {
+  const out = [];
+  Object.keys(impostazioni || {}).forEach(chiave => {
+    if (!chiave.startsWith(KIT_PREFISSO)) return;
+    try {
+      const kit = JSON.parse(impostazioni[chiave]);
+      if (kit && kit.nome && Array.isArray(kit.materiali) && Array.isArray(kit.lavori)) {
+        out.push({
+          ...kit,
+          id: chiave,
+          personale: true
+        });
+      }
+    } catch (err) {/* riga non valida: si ignora */}
+  });
+  return out.sort((a, b) => String(b.creato || '').localeCompare(String(a.creato || '')));
+}
+function descrizioneKit(t) {
+  const m = t.materiali.length;
+  const l = (t.lavori || []).length;
+  return [m ? m + (m === 1 ? ' materiale' : ' materiali') : '', l ? l + (l === 1 ? ' voce di lavoro' : ' voci di lavoro') : ''].filter(Boolean).join(' · ');
+}
+function kitDaVoci(nome, voci, prodotti) {
+  const materiali = [];
+  const lavori = [];
+  const zone = [];
+  (voci || []).forEach(i => {
+    if (!i || i.kind === 'trasferta') return;
+    const zona = i.zona || 'generico';
+    if (zona !== 'generico') zone.push(zona);
+    if (i.kind === 'lavoro') {
+      lavori.push({
+        nome: i.nome,
+        categoria: i.categoriaDocumento || CATEGORIE_DOCUMENTO_DEFAULT[0],
+        prezzo: i.prezzoUnitario || 0,
+        qty: i.qty || 1,
+        zona
+      });
+      return;
+    }
+    const p = prodotti.find(x => x.id === i.id) || prodotti.find(x => x.nome === i.nome);
+    materiali.push({
+      nome: i.nome,
+      categoria: p && p.categoria || indovinaCategoria(i.nome, 'Idraulica'),
+      unita: p && p.unita || i.unita || 'pz',
+      prezzo: i.prezzoUnitario || 0,
+      qty: i.qty || 1,
+      zona
+    });
+  });
+  return {
+    v: 1,
+    nome,
+    zona: zone[0] || 'generico',
+    materiali,
+    lavori,
+    creato: new Date().toISOString()
+  };
 }
 
 /* Template lavori preimpostati — aprendo il template si aggiungono
@@ -5279,13 +5430,29 @@ function FpvRigaProdotto({
   const Icona = iconaCategoria(p.categoria);
   const unita = p.unita && p.unita !== 'pz' ? ' / ' + fpvUnitaBreve(p.unita) : '';
   const sub = [p.fornitore, p.codice].filter(Boolean).join(' · ');
-  const corpo = /*#__PURE__*/React.createElement(React.Fragment, null, p.fotoUrl ? /*#__PURE__*/React.createElement("img", {
-    src: p.fotoUrl,
+  const corpo = /*#__PURE__*/React.createElement(React.Fragment, null, p.fotoUrl ? /*#__PURE__*/React.createElement("span", {
+    role: "button",
+    tabIndex: 0,
+    "aria-label": 'Ingrandisci la foto di ' + p.nome,
+    onClick: e => {
+      e.stopPropagation();
+      mostraFotoGrande(p, modo === 'scelta' ? () => onAggiungi(p) : null);
+    },
+    onKeyDown: e => {
+      if (e.key === 'Enter') {
+        e.stopPropagation();
+        mostraFotoGrande(p, modo === 'scelta' ? () => onAggiungi(p) : null);
+      }
+    },
+    className: "relative shrink-0 cursor-zoom-in active:opacity-70 after:content-[''] after:absolute after:-inset-1"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: p.fotoMini || p.fotoUrl,
     alt: "",
     loading: "lazy",
-    className: "w-11 h-11 rounded-[13px] object-cover shrink-0 bg-[#F0F0F4]"
-  }) : /*#__PURE__*/React.createElement("span", {
-    className: "w-11 h-11 rounded-[13px] bg-[#F0F0F4] text-[#6E6E78] flex items-center justify-center shrink-0"
+    decoding: "async",
+    className: "w-[52px] h-[52px] rounded-[14px] object-contain bg-[#F5F5F7] border border-[#EDEDF1]"
+  })) : /*#__PURE__*/React.createElement("span", {
+    className: "w-[52px] h-[52px] rounded-[14px] bg-[#F5F5F7] text-[#A1A1AA] flex items-center justify-center shrink-0"
   }, /*#__PURE__*/React.createElement(Icona, {
     className: "w-5 h-5"
   })), /*#__PURE__*/React.createElement("span", {
@@ -5571,7 +5738,9 @@ function PreventiviPage({
   onLayoutChange,
   onVaiAiClienti,
   onApriMenu,
-  prodottiLoading
+  prodottiLoading,
+  impostazioni,
+  setImpostazioni
 }) {
   const [mode, setMode] = useState('lista'); // 'lista' | 'nuovo' | 'dettaglio'
   const [clienteId, setClienteId] = useState(null);
@@ -5636,6 +5805,12 @@ function PreventiviPage({
   const [invioInCorso, setInvioInCorso] = useState(null); // null | 'scarica' | 'invia'
   const [fotoTipo, setFotoTipo] = useState('prima'); // tipo delle prossime foto: prima | dopo
   const [kitInCorso, setKitInCorso] = useState(false);
+  // "Salva come kit": le voci da salvare, il nome scelto e lo stato del salvataggio
+  const [kitDaSalvare, setKitDaSalvare] = useState([]);
+  const [kitNome, setKitNome] = useState('');
+  const [kitSalvando, setKitSalvando] = useState(false);
+  // per mostrare la foto di un prodotto già nel preventivo senza cercarlo ogni volta nel catalogo
+  const prodottiPerId = React.useMemo(() => new Map(prodotti.map(p => [p.id, p])), [prodotti]);
   const [voceApertaId, setVoceApertaId] = useState(null);
   const [voceNome, setVoceNome] = useState('');
   const [vocePrezzo, setVocePrezzo] = useState('');
@@ -6454,7 +6629,7 @@ function PreventiviPage({
           return prev.map(i => i.id === prodId ? {
             ...i,
             qty: nuovaQty,
-            meta: unitaUsata === 'm' ? `${nuovaQty} m × ${i.prezzoUnitario.toLocaleString('it-IT', {
+            meta: unitaUsata && unitaUsata !== 'pz' ? `${nuovaQty} ${unitaUsata} × ${i.prezzoUnitario.toLocaleString('it-IT', {
               minimumFractionDigits: 2
             })} €` : i.meta
           } : i);
@@ -6462,13 +6637,13 @@ function PreventiviPage({
         return [...prev, {
           id: prodId,
           nome: tm.nome,
-          meta: unitaUsata === 'm' ? `${tm.qty} m × ${prezzoUsato.toLocaleString('it-IT', {
+          meta: unitaUsata && unitaUsata !== 'pz' ? `${tm.qty} ${unitaUsata} × ${prezzoUsato.toLocaleString('it-IT', {
             minimumFractionDigits: 2
           })} €` : 'Standard',
           prezzoUnitario: prezzoUsato,
           qty: tm.qty,
           kind: 'prodotto',
-          zona: template.zona,
+          zona: tm.zona || template.zona,
           unita: unitaUsata
         }];
       });
@@ -6516,12 +6691,108 @@ function PreventiviPage({
           minimumFractionDigits: 2
         })} €` : 'Lavoro',
         prezzoUnitario: tl.prezzo || 0,
-        qty: 1,
+        qty: tl.qty || 1,
         kind: 'lavoro',
-        zona: template.zona,
+        zona: tl.zona || template.zona,
         categoriaDocumento: tl.categoria
       }]);
     }
+  };
+
+  // Kit personali: "Salva come kit" trasforma le voci di un preventivo (in
+  // costruzione o già fatto) in un kit riusabile, visibile a tutti gli utenti.
+  const kitPersonali = leggiKitPersonali(impostazioni);
+  const kitTutti = [...kitPersonali, ...TEMPLATE_LAVORI];
+  const apriSalvaKit = voci => {
+    const utili = (voci || []).filter(i => i.kind !== 'trasferta');
+    if (utili.length === 0) {
+      mostraToast('Non ci sono voci da salvare.', 'info');
+      return;
+    }
+    setKitDaSalvare(utili);
+    setKitNome('');
+    setRapidoExtra('salvakit');
+  };
+  const salvaKit = async () => {
+    const nome = kitNome.trim();
+    if (!nome || kitSalvando) return;
+    // stesso nome di un kit già salvato: lo aggiorna (tenendo il nome com'era)
+    // invece di farne un doppione
+    const stesso = kitPersonali.find(k => k.nome.trim().toLowerCase() === nome.toLowerCase());
+    const kit = kitDaVoci(stesso ? stesso.nome : nome, kitDaSalvare, prodotti);
+    if (kit.materiali.length === 0 && kit.lavori.length === 0) return;
+    const chiave = stesso ? stesso.id : KIT_PREFISSO + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const valore = JSON.stringify(kit);
+    setKitSalvando(true);
+    const {
+      error
+    } = await sb.from('impostazioni').upsert({
+      chiave,
+      valore
+    });
+    setKitSalvando(false);
+    if (error) {
+      mostraToast('Non sono riuscito a salvare il kit: ' + error.message);
+      return;
+    }
+    setImpostazioni(prev => ({
+      ...prev,
+      [chiave]: valore
+    }));
+    setRapidoExtra(null);
+    mostraToast(stesso ? 'Kit aggiornato: ' + nome : 'Kit salvato. Lo trovi in Kit, sotto "I miei kit".', 'info');
+  };
+  const eliminaKit = async k => {
+    if (!window.confirm('Eliminare il kit «' + k.nome + '»? I preventivi già fatti non cambiano.')) return;
+    const {
+      error
+    } = await sb.from('impostazioni').delete().eq('chiave', k.id);
+    if (error) {
+      mostraToast('Non sono riuscito a eliminare il kit: ' + error.message);
+      return;
+    }
+    setImpostazioni(prev => {
+      const n = {
+        ...prev
+      };
+      delete n[k.id];
+      return n;
+    });
+  };
+  const renderSheetSalvaKit = () => {
+    const nMateriali = kitDaSalvare.filter(i => i.kind !== 'lavoro' && i.kind !== 'trasferta').length;
+    const nLavori = kitDaSalvare.filter(i => i.kind === 'lavoro').length;
+    return /*#__PURE__*/React.createElement(FpvSheet, {
+      title: "Salva come kit",
+      sottotitolo: "Le stesse voci, pronte da riusare per un altro cliente.",
+      onClose: () => setRapidoExtra(null),
+      footer: /*#__PURE__*/React.createElement("button", {
+        type: "button",
+        onClick: salvaKit,
+        disabled: kitSalvando || !kitNome.trim(),
+        className: "app-ripple w-full h-[56px] rounded-full bg-[#111113] text-white text-[17px] font-bold disabled:opacity-40 flex items-center justify-center gap-2"
+      }, /*#__PURE__*/React.createElement(Check, {
+        className: "w-5 h-5",
+        strokeWidth: 3
+      }), " ", kitSalvando ? 'Salvo…' : 'Salva il kit')
+    }, /*#__PURE__*/React.createElement("div", {
+      className: "space-y-4 pb-2"
+    }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+      className: "text-[13.5px] font-semibold text-[#111113] mb-1.5"
+    }, "Nome del kit"), /*#__PURE__*/React.createElement("input", {
+      value: kitNome,
+      onChange: e => setKitNome(e.target.value),
+      placeholder: "Es. Bagno completo con piatto doccia",
+      onKeyDown: e => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          salvaKit();
+        }
+      },
+      className: "w-full h-[52px] px-4 rounded-[16px] bg-white border border-[#E6E6EB] outline-none text-[16px] text-[#111113]"
+    })), /*#__PURE__*/React.createElement("p", {
+      className: "text-[13px] text-[#6E6E78] leading-snug"
+    }, nMateriali, " ", nMateriali === 1 ? 'materiale' : 'materiali', " \xB7 ", nLavori, " ", nLavori === 1 ? 'voce di lavoro' : 'voci di lavoro', ". Cliente e foto non vengono salvati. I prezzi dei materiali si aggiornano dal catalogo ogni volta che usi il kit.")));
   };
 
   // Gestione foto cantiere — ogni foto viene compressa e caricata subito su
@@ -7215,7 +7486,7 @@ function PreventiviPage({
 
     // ricerca unica: prodotti + voci di lavoro + kit
     const qCat = queryCatalogoPreventivo.trim();
-    const risultatiAdd = qCat ? [...cercaIntelligente(TEMPLATE_LAVORI, qCat, estraiSemplice).map(t => ({
+    const risultatiAdd = qCat ? [...cercaIntelligente(kitTutti, qCat, estraiSemplice).map(t => ({
       tipo: 'kit',
       t
     })), ...cercaIntelligente(vociLavoro, qCat, estraiVoce).slice(0, 12).map(v => ({
@@ -7244,7 +7515,7 @@ function PreventiviPage({
       if (item.kind === 'lavoro') return 'Voce di lavoro';
       if (item.unita && item.unita !== 'pz') return item.qty + ' ' + fpvUnitaBreve(item.unita) + ' × ' + fmtEuro2(item.prezzoUnitario);
       const meta = /^(Standard|Premium|Lusso)$/.test(item.meta || '') ? '' : item.meta;
-      return item.descrizioneProdotto || item.fornitore || meta || '';
+      return pulisciDescrizioneProdotto(item.nome, item.descrizioneProdotto) || item.fornitore || meta || '';
     };
     const goBack = () => {
       if (sheet) {
@@ -7480,7 +7751,7 @@ function PreventiviPage({
       className: "text-[15px] font-semibold text-[#111113] leading-snug"
     }, r.t.nome), /*#__PURE__*/React.createElement("span", {
       className: "shrink-0 text-[11.5px] font-bold px-2.5 py-1 rounded-full bg-[#EDEDF1] text-[#4A4A52]"
-    }, "KIT"))), risultatiAdd.length === 0 && /*#__PURE__*/React.createElement("div", {
+    }, r.t.personale ? 'IL MIO KIT' : 'KIT'))), risultatiAdd.length === 0 && /*#__PURE__*/React.createElement("div", {
       className: "px-4 py-8 text-center"
     }, /*#__PURE__*/React.createElement("p", {
       className: "text-[14px] text-[#6E6E78]"
@@ -7577,16 +7848,24 @@ function PreventiviPage({
     }, /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: () => setRapidoExtra('zona'),
-      className: "inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#111113] h-8 px-3 rounded-full bg-white border border-[#E6E6EB]"
+      className: "inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#111113] h-8 px-3 rounded-full bg-white border border-[#E6E6EB] min-w-0 max-w-[56%]"
     }, /*#__PURE__*/React.createElement(MapPin, {
-      className: "w-3.5 h-3.5 text-[#6E6E78]"
-    }), " ", zonaNome, " ", /*#__PURE__*/React.createElement(ChevronDown, {
-      className: "w-3.5 h-3.5 text-[#6E6E78]"
-    })), nVoci > 1 && /*#__PURE__*/React.createElement("button", {
+      className: "w-3.5 h-3.5 text-[#6E6E78] shrink-0"
+    }), " ", /*#__PURE__*/React.createElement("span", {
+      className: "truncate"
+    }, zonaNome), " ", /*#__PURE__*/React.createElement(ChevronDown, {
+      className: "w-3.5 h-3.5 text-[#6E6E78] shrink-0"
+    })), nVoci > 1 && /*#__PURE__*/React.createElement("div", {
+      className: "flex items-center shrink-0 whitespace-nowrap"
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => apriSalvaKit(carrello),
+      className: "text-[13px] font-semibold text-[#0071E3] h-8 px-2"
+    }, "Salva kit"), /*#__PURE__*/React.createElement("button", {
       type: "button",
       onClick: () => setRiordinaAperto('riepilogo'),
       className: "text-[13px] font-semibold text-[#0071E3] h-8 px-2"
-    }, "Riordina")), nVoci === 0 ? /*#__PURE__*/React.createElement("div", {
+    }, "Riordina"))), nVoci === 0 ? /*#__PURE__*/React.createElement("div", {
       className: "bg-white border border-dashed border-[#D6D6DC] rounded-[18px] px-4 py-10 text-center"
     }, /*#__PURE__*/React.createElement("p", {
       className: "text-[16px] font-semibold text-[#111113]"
@@ -7608,7 +7887,21 @@ function PreventiviPage({
       }, g.voci.map(item => /*#__PURE__*/React.createElement("div", {
         key: item.id,
         className: "px-4 py-3 flex items-center gap-3"
-      }, /*#__PURE__*/React.createElement("button", {
+      }, (() => {
+        const pr = item.kind !== 'lavoro' ? prodottiPerId.get(item.id) : null;
+        return pr && pr.fotoUrl ? /*#__PURE__*/React.createElement("button", {
+          type: "button",
+          "aria-label": 'Ingrandisci la foto di ' + pr.nome,
+          onClick: () => mostraFotoGrande(pr, null),
+          className: "relative shrink-0 active:opacity-70 after:content-[''] after:absolute after:-inset-1"
+        }, /*#__PURE__*/React.createElement("img", {
+          src: pr.fotoMini || pr.fotoUrl,
+          alt: "",
+          loading: "lazy",
+          decoding: "async",
+          className: "w-12 h-12 rounded-[13px] object-contain bg-[#F5F5F7] border border-[#EDEDF1]"
+        })) : null;
+      })(), /*#__PURE__*/React.createElement("button", {
         type: "button",
         onClick: () => apriVoce(item),
         className: "min-w-0 flex-1 text-left active:opacity-70"
@@ -7969,7 +8262,37 @@ function PreventiviPage({
       onClose: () => setRapidoExtra(null)
     }, /*#__PURE__*/React.createElement("div", {
       className: "space-y-2.5"
-    }, TEMPLATE_LAVORI.map(t => /*#__PURE__*/React.createElement("button", {
+    }, /*#__PURE__*/React.createElement("p", {
+      className: "text-[12px] font-semibold text-[#6E6E78] px-1 pt-0.5"
+    }, "I miei kit"), kitPersonali.length === 0 && /*#__PURE__*/React.createElement("p", {
+      className: "text-[13px] text-[#6E6E78] leading-snug px-1 pb-1"
+    }, "Ancora nessuno. Compila un preventivo e tocca \xABSalva come kit\xBB: da quel momento lo trovi qui, pronto per il prossimo cliente."), kitPersonali.map(t => /*#__PURE__*/React.createElement("div", {
+      key: t.id,
+      className: "flex items-stretch gap-2"
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      disabled: kitInCorso,
+      onClick: async () => {
+        setKitInCorso(true);
+        await applicaTemplate(t);
+        setKitInCorso(false);
+        setRapidoExtra(null);
+      },
+      className: "flex-1 min-w-0 bg-white border border-[#E6E6EB] rounded-[18px] px-4 py-3.5 text-left active:bg-[#F5F5F7] disabled:opacity-60"
+    }, /*#__PURE__*/React.createElement("p", {
+      className: "text-[16px] font-semibold text-[#111113] leading-snug"
+    }, t.nome), /*#__PURE__*/React.createElement("p", {
+      className: "text-[13px] text-[#6E6E78] mt-0.5"
+    }, descrizioneKit(t))), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => eliminaKit(t),
+      "aria-label": 'Elimina il kit ' + t.nome,
+      className: "app-ripple shrink-0 w-[48px] rounded-[18px] bg-white border border-[#E6E6EB] text-[#6E6E78] flex items-center justify-center active:bg-[#FDE8E8] active:text-[#B42318]"
+    }, /*#__PURE__*/React.createElement(Trash2, {
+      className: "w-[18px] h-[18px]"
+    })))), /*#__PURE__*/React.createElement("p", {
+      className: "text-[12px] font-semibold text-[#6E6E78] px-1 pt-2"
+    }, "Kit pronti"), TEMPLATE_LAVORI.map(t => /*#__PURE__*/React.createElement("button", {
       key: t.id,
       type: "button",
       disabled: kitInCorso,
@@ -7984,9 +8307,9 @@ function PreventiviPage({
       className: "text-[16px] font-semibold text-[#111113]"
     }, t.nome), /*#__PURE__*/React.createElement("p", {
       className: "text-[13px] text-[#6E6E78] mt-0.5"
-    }, [t.materiali.length ? t.materiali.length + ' materiali' : '', (t.lavori || []).length ? t.lavori.length + ' voci di lavoro' : ''].filter(Boolean).join(' · ')))), kitInCorso && /*#__PURE__*/React.createElement("p", {
+    }, descrizioneKit(t)))), kitInCorso && /*#__PURE__*/React.createElement("p", {
       className: "text-center text-[13px] text-[#6E6E78] py-2"
-    }, "Aggiungo le voci\u2026"))), sheet === 'nuovo' && /*#__PURE__*/React.createElement(FpvSheet, {
+    }, "Aggiungo le voci\u2026"))), sheet === 'salvakit' && renderSheetSalvaKit(), sheet === 'nuovo' && /*#__PURE__*/React.createElement(FpvSheet, {
       title: "Nuovo prodotto",
       sottotitolo: "Si salva anche nel catalogo: la prossima volta lo trovi subito.",
       onClose: () => setRapidoExtra(null),
@@ -8181,6 +8504,12 @@ function PreventiviPage({
         await scaricaPdfInterno(numeroMostrato);
       }
     }, {
+      label: 'Salva come kit',
+      sub: 'Riusa questi materiali e lavori per un altro cliente',
+      Icon: Zap,
+      onClick: () => apriSalvaKit(carrello),
+      disabled: nVoci === 0
+    }, {
       label: 'Riordina le voci',
       sub: 'Cambia l’ordine nel documento',
       Icon: GripVertical,
@@ -8344,7 +8673,14 @@ function PreventiviPage({
       className: "w-5 h-5"
     }), /*#__PURE__*/React.createElement("span", {
       className: "text-[12px] font-semibold"
-    }, a.label)))), /*#__PURE__*/React.createElement("div", {
+    }, a.label)))), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      onClick: () => apriSalvaKit(carrelloDett),
+      disabled: nVociDett === 0,
+      className: "app-ripple w-full h-12 rounded-full bg-white border border-[#E6E6EB] flex items-center justify-center gap-2 text-[14.5px] font-semibold text-[#111113] active:bg-[#F5F5F7] disabled:opacity-40"
+    }, /*#__PURE__*/React.createElement(Zap, {
+      className: "w-4 h-4"
+    }), " Salva come kit"), /*#__PURE__*/React.createElement("div", {
       className: "flex gap-1 p-1 bg-[#E6E6EB] rounded-[18px]"
     }, [['cliente', 'Per il cliente'], ['interno', 'Interno']].map(([id, label]) => /*#__PURE__*/React.createElement("button", {
       key: id,
@@ -8414,7 +8750,7 @@ function PreventiviPage({
     }, s), s === p.stato && /*#__PURE__*/React.createElement(Check, {
       className: "w-5 h-5 text-[#14704D]",
       strokeWidth: 3
-    }))))));
+    }))))), sheet === 'salvakit' && renderSheetSalvaKit());
   }
   return null;
 }
@@ -8526,6 +8862,142 @@ function ImpostazioniPage({
       setImp({
         fase: 'errore',
         msg: 'Non è andata: ' + (err && err.message || err) + '. Puoi riprovare: i prodotti già caricati vengono saltati.'
+      });
+    }
+  };
+
+  // strumento per noi: carica le foto dei prodotti da un pacchetto preparato in anticipo
+  // (index.json + una foto grande "<k>.webp" e una miniatura "<k>_t.webp" per ogni foto).
+  // Riprende da dove era rimasto: salta i prodotti che hanno già la foto e non tocca
+  // mai le foto messe a mano da Denis e Deborah.
+  const [ft, setFt] = useState({
+    fase: 'pronto',
+    msg: ''
+  });
+  const caricaFoto = async () => {
+    if (ft.fase === 'in corso') return;
+    // il pacchetto si legge solo da questo computer (mai da un indirizzo qualsiasi messo in un link)
+    const base = (() => {
+      const predefinito = 'http://127.0.0.1:8092/';
+      try {
+        const v = new URLSearchParams(window.location.search).get('fotopack');
+        return v && /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\/$/.test(v) ? v : predefinito;
+      } catch (e) {
+        return predefinito;
+      }
+    })();
+    setFt({
+      fase: 'in corso',
+      msg: 'Leggo l’elenco delle foto…'
+    });
+    try {
+      const res = await fetch(base + 'index.json', {
+        cache: 'no-store'
+      });
+      if (!res.ok) throw new Error('index.json non trovato (' + res.status + ')');
+      const pacco = await res.json();
+      // prodotti dal database (non dallo stato dell'app): id, fornitore, codice, foto attuale
+      const perChiave = {};
+      for (let da = 0;; da += 1000) {
+        const {
+          data,
+          error
+        } = await sb.from('prodotti').select('id,fornitore,codice,foto_path').order('id', {
+          ascending: true
+        }).range(da, da + 999);
+        if (error) throw error;
+        data.forEach(p => {
+          perChiave[(p.fornitore || '') + '|' + (p.codice || '')] = p;
+        });
+        if (data.length < 1000) break;
+      }
+      const lavori = [];
+      let giaFatti = 0,
+        protette = 0,
+        senzaProdotto = 0;
+      pacco.foto.forEach(f => {
+        const percorso = 'cat/' + f.k + '.webp';
+        const da = [];
+        f.p.forEach(ch => {
+          const pr = perChiave[ch];
+          if (!pr) {
+            senzaProdotto++;
+            return;
+          }
+          if (pr.foto_path === percorso) {
+            giaFatti++;
+            return;
+          }
+          if (pr.foto_path) {
+            protette++;
+            return;
+          }
+          da.push(pr.id);
+        });
+        if (da.length) lavori.push({
+          k: f.k,
+          percorso,
+          ids: da
+        });
+      });
+      if (lavori.length === 0) {
+        setFt({
+          fase: 'fatto',
+          msg: 'Le foto sono già tutte caricate (' + giaFatti + ' prodotti, ' + protette + ' con foto messa a mano lasciati com’erano).'
+        });
+        return;
+      }
+      let fatti = 0,
+        errori = 0,
+        finiti = 0;
+      let i = 0;
+      const lavora = async () => {
+        while (i < lavori.length) {
+          const l = lavori[i++];
+          try {
+            const [grande, mini] = await Promise.all([fetch(base + l.k + '.webp'), fetch(base + l.k + '_t.webp')]);
+            if (!grande.ok || !mini.ok) throw new Error('foto non trovata: ' + l.k);
+            const [bg, bm] = await Promise.all([grande.blob(), mini.blob()]);
+            const opz = {
+              contentType: 'image/webp',
+              upsert: true,
+              cacheControl: '31536000'
+            };
+            const r1 = await sb.storage.from('prodotti-foto').upload(l.percorso, bg, opz);
+            if (r1.error) throw r1.error;
+            const r2 = await sb.storage.from('prodotti-foto').upload(l.percorso.replace(/\.webp$/, '_t.webp'), bm, opz);
+            if (r2.error) throw r2.error;
+            for (let g = 0; g < l.ids.length; g += 150) {
+              const {
+                error
+              } = await sb.from('prodotti').update({
+                foto_path: l.percorso
+              }).in('id', l.ids.slice(g, g + 150));
+              if (error) throw error;
+            }
+            fatti += l.ids.length;
+          } catch (err) {
+            errori++;
+            console.error('Foto non caricata', l.k, err);
+          }
+          finiti++;
+          if (finiti % 10 === 0) setFt({
+            fase: 'in corso',
+            msg: 'Foto caricate per ' + fatti + ' prodotti (' + finiti + ' di ' + lavori.length + ' foto)' + (errori ? ', errori: ' + errori : '') + '…'
+          });
+        }
+      };
+      await Promise.all(Array.from({
+        length: 16
+      }, lavora));
+      setFt({
+        fase: errori ? 'errore' : 'fatto',
+        msg: 'Fatto: foto per ' + fatti + ' prodotti' + (giaFatti ? ' (altri ' + giaFatti + ' le avevano già)' : '') + (protette ? ', ' + protette + ' con foto messa a mano lasciati com’erano' : '') + (errori ? '. Errori su ' + errori + ' foto: premi di nuovo il tasto, riprende da dove era rimasto.' : '. Ricarica l’app per vederle.')
+      });
+    } catch (err) {
+      setFt({
+        fase: 'errore',
+        msg: 'Non è andata: ' + (err && err.message || err) + '. Puoi riprovare: riprende da dove era rimasto.'
       });
     }
   };
@@ -8711,7 +9183,15 @@ function ImpostazioniPage({
     type: "button",
     onClick: () => window.location.reload(),
     className: "mt-3 h-11 px-5 rounded-full bg-[#F0F0F4] text-[#111113] text-[14px] font-semibold"
-  }, "Ricarica l\u2019app")), /*#__PURE__*/React.createElement("p", {
+  }, "Ricarica l\u2019app"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: caricaFoto,
+    disabled: ft.fase === 'in corso',
+    className: "app-ripple mt-4 w-full h-[52px] rounded-full bg-[#111113] text-white text-[15px] font-semibold disabled:opacity-40 active:opacity-80"
+  }, ft.fase === 'in corso' ? 'Carico le foto…' : 'Carica le foto dei prodotti'), ft.msg && /*#__PURE__*/React.createElement("p", {
+    className: "mt-3 text-[13.5px] font-medium text-[#4A4A52] leading-snug",
+    role: "status"
+  }, ft.msg)), /*#__PURE__*/React.createElement("p", {
     className: "text-center text-[12px] text-[#A1A1AA] pt-2"
   }, "Versione ", APP_VERSION));
 }
@@ -8945,9 +9425,11 @@ function CatalogoPage({
       setProdotti(prev => prev.map(x => x.id === p.id ? {
         ...x,
         fotoPath: path,
-        fotoUrl
+        fotoUrl,
+        fotoMini: fotoUrl
       } : x));
-      if (vecchioPath) sb.storage.from('prodotti-foto').remove([vecchioPath]).catch(() => {});
+      // le foto di catalogo ("cat/…") sono condivise da più prodotti: non si cancellano mai da qui
+      if (vecchioPath && !vecchioPath.startsWith('cat/')) sb.storage.from('prodotti-foto').remove([vecchioPath]).catch(() => {});
     } catch (err) {
       mostraToast('Errore nel caricare la foto: ' + err.message);
     }
@@ -9360,6 +9842,82 @@ function mostraToast(messaggio, tipo = 'errore') {
       tipo
     }
   }));
+}
+
+// foto grande di un prodotto: per mostrarla al cliente mentre sceglie. Si apre
+// toccando la miniatura (stesso meccanismo del toast: un solo componente in App
+// che ascolta, così le righe di catalogo e di preventivo non devono passarsi nulla)
+function mostraFotoGrande(prodotto, onAggiungi) {
+  window.dispatchEvent(new CustomEvent('ferari-foto', {
+    detail: {
+      prodotto,
+      onAggiungi
+    }
+  }));
+}
+function FotoGrandeHost() {
+  const [vista, setVista] = useState(null);
+  const [caricata, setCaricata] = useState(false);
+  useEffect(() => {
+    const apri = e => {
+      setCaricata(false);
+      setVista(e.detail);
+    };
+    window.addEventListener('ferari-foto', apri);
+    return () => window.removeEventListener('ferari-foto', apri);
+  }, []);
+  useEffect(() => {
+    if (!vista) return;
+    const tasto = e => {
+      if (e.key === 'Escape') setVista(null);
+    };
+    window.addEventListener('keydown', tasto);
+    return () => window.removeEventListener('keydown', tasto);
+  }, [vista]);
+  if (!vista || !vista.prodotto) return null;
+  const p = vista.prodotto;
+  const unita = p.unita && p.unita !== 'pz' ? ' / ' + fpvUnitaBreve(p.unita) : '';
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-[120] bg-[#111113] flex flex-col",
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-label": "Foto del prodotto",
+    onClick: () => setVista(null)
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex justify-end px-3 pt-[calc(0.75rem+env(safe-area-inset-top))]"
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    "aria-label": "Chiudi",
+    onClick: () => setVista(null),
+    className: "app-ripple w-11 h-11 rounded-full bg-white/15 text-white flex items-center justify-center active:bg-white/25"
+  }, /*#__PURE__*/React.createElement(X, {
+    className: "w-5 h-5"
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "flex-1 min-h-0 flex items-center justify-center px-3 py-2"
+  }, /*#__PURE__*/React.createElement("img", {
+    src: p.fotoUrl,
+    alt: p.nome,
+    onLoad: () => setCaricata(true),
+    onClick: e => e.stopPropagation(),
+    className: 'max-w-full max-h-full object-contain rounded-[20px] bg-white transition-opacity duration-150 ' + (caricata ? 'opacity-100' : 'opacity-0')
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "px-4 pt-2 pb-[calc(1rem+env(safe-area-inset-bottom))] max-w-lg w-full mx-auto"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "text-[16px] font-semibold text-white leading-snug line-clamp-3"
+  }, p.nome), /*#__PURE__*/React.createElement("p", {
+    className: "mt-1 text-[15px] tabular-nums text-white/75"
+  }, fmtEuro2(p.prezzo), unita, p.fornitore ? ' · ' + p.fornitore : ''), vista.onAggiungi && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      vista.onAggiungi();
+      setVista(null);
+      mostraToast('Aggiunto al preventivo.', 'info');
+    },
+    className: "app-ripple mt-3 w-full h-[54px] rounded-full bg-white text-[#111113] text-[16px] font-bold flex items-center justify-center gap-2 active:opacity-85"
+  }, /*#__PURE__*/React.createElement(Plus, {
+    className: "w-5 h-5",
+    strokeWidth: 2.6
+  }), " Aggiungi al preventivo")));
 }
 function ToastHost() {
   const [toast, setToast] = useState(null);
@@ -9859,7 +10417,7 @@ function App() {
   };
   return /*#__PURE__*/React.createElement("div", {
     className: "h-app-viewport flex bg-[#F5F5F7] overflow-hidden min-h-0 max-h-full"
-  }, /*#__PURE__*/React.createElement(ToastHost, null), /*#__PURE__*/React.createElement(Sidebar, {
+  }, /*#__PURE__*/React.createElement(ToastHost, null), /*#__PURE__*/React.createElement(FotoGrandeHost, null), /*#__PURE__*/React.createElement(Sidebar, {
     currentPage: currentPage,
     setCurrentPage: goToPage,
     onLogout: () => sb.auth.signOut(),
@@ -9872,19 +10430,19 @@ function App() {
     subtitle: subtitle,
     onMenuClick: () => setMobileNavOpen(true)
   }), versioneNuovaDisponibile && /*#__PURE__*/React.createElement("div", {
-    className: "px-4 py-2 text-xs font-semibold flex items-center justify-between gap-2 shrink-0 bg-emerald-50 text-emerald-700"
+    className: "px-4 py-2 text-[13px] font-semibold flex items-center justify-between gap-3 shrink-0 bg-[#F0F0F4] text-[#111113]"
   }, /*#__PURE__*/React.createElement("span", null, "\xC8 disponibile una versione pi\xF9 recente dell'app."), /*#__PURE__*/React.createElement("button", {
     onClick: () => window.location.reload(),
-    className: "shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-md"
+    className: "shrink-0 h-9 px-4 rounded-full bg-[#111113] text-white text-[13px] font-semibold active:opacity-80"
   }, "Aggiorna ora")), appenaAggiornata && /*#__PURE__*/React.createElement("div", {
-    className: "px-4 py-2 text-xs font-semibold flex items-center justify-between gap-2 shrink-0 bg-[#F0F0F4] text-[#0071E3]"
+    className: "px-4 py-2 text-[13px] font-semibold flex items-center justify-between gap-3 shrink-0 bg-[#F0F0F4] text-[#111113]"
   }, /*#__PURE__*/React.createElement("span", {
     className: "flex items-center gap-1.5"
   }, /*#__PURE__*/React.createElement(Check, {
     className: "w-3.5 h-3.5 shrink-0"
   }), "App aggiornata all'ultima versione."), /*#__PURE__*/React.createElement("button", {
     onClick: () => setAppenaAggiornata(false),
-    className: "shrink-0 bg-[#111113] hover:bg-[#2B2B30] text-white px-2.5 py-1.5 rounded-md"
+    className: "shrink-0 h-9 min-w-[56px] px-4 rounded-full bg-[#111113] text-white text-[13px] font-semibold active:opacity-80"
   }, "OK")), (!codaOffline.online || codaOffline.count > 0) && /*#__PURE__*/React.createElement("div", {
     className: `px-4 py-2 text-xs font-semibold flex items-center justify-between gap-2 shrink-0 ${!codaOffline.online ? 'bg-amber-50 text-amber-700' : 'bg-[#F0F0F4] text-[#0071E3]'}`
   }, /*#__PURE__*/React.createElement("span", null, !codaOffline.online ? 'Sei offline: le modifiche restano sul telefono e si caricano da sole quando torna la rete.' : `${codaOffline.count} element${codaOffline.count === 1 ? 'o' : 'i'} in attesa di sincronizzazione.`), codaOffline.online && codaOffline.count > 0 && /*#__PURE__*/React.createElement("button", {
@@ -9919,7 +10477,9 @@ function App() {
     onLayoutChange: setLayoutComposer,
     onVaiAiClienti: () => goToPage('clienti'),
     onApriMenu: () => setMobileNavOpen(true),
-    prodottiLoading: prodottiLoading
+    prodottiLoading: prodottiLoading,
+    impostazioni: impostazioni,
+    setImpostazioni: setImpostazioni
   }), currentPage === 'clienti' && /*#__PURE__*/React.createElement(ClientiPage, {
     clienti: clienti,
     setClienti: setClienti,
