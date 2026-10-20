@@ -274,7 +274,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION = '202610200900';
+const APP_VERSION = '202610201400';
 
 // R10 (chiesto da Denis: dopo un push non si vedeva conferma che l'app si
 // fosse aggiornata) — TENTATIVO IN SOSPESO, non ancora funzionante: la
@@ -5512,7 +5512,7 @@ function FpvScheletroRighe({
     key: i,
     className: "px-4 py-3 flex items-center gap-3"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "w-11 h-11 rounded-[13px] bg-[#EDEDF1]"
+    className: "w-[52px] h-[52px] rounded-[14px] bg-[#EDEDF1]"
   }), /*#__PURE__*/React.createElement("div", {
     className: "flex-1 space-y-2"
   }, /*#__PURE__*/React.createElement("div", {
@@ -5571,6 +5571,45 @@ function FpvCatalogo({
   }, [cerca, qDiff, cat, forn, sub]);
   const fornitori = ['Tutti', ...FORNITORI_CATALOGO];
   const IconaCat = iconaCategoria(cat);
+
+  // quanti prodotti ci sono per ogni coppia categoria + fornitore: serve a non lasciare
+  // mai una pagina vuota (es. "Deghi" mentre è aperta "Idraulica": Deghi vende solo bagno)
+  const contaCatForn = React.useMemo(() => {
+    const m = {};
+    prodotti.forEach(p => {
+      const kc = p.categoria + '|*',
+        kf = p.categoria + '|' + p.fornitore;
+      m[kc] = (m[kc] || 0) + 1;
+      m[kf] = (m[kf] || 0) + 1;
+    });
+    return m;
+  }, [prodotti]);
+  const haProdotti = (c, f) => (contaCatForn[c + '|' + (f === 'Tutti' ? '*' : f)] || 0) > 0;
+  // la categoria scelta (anche quando cambia da sola) resta sempre visibile nella riga che scorre di lato
+  useEffect(() => {
+    const el = document.querySelector('[data-cat-attiva="1"]');
+    if (el && el.scrollIntoView) {
+      try {
+        el.scrollIntoView({
+          inline: 'center',
+          block: 'nearest'
+        });
+      } catch (e) {/* vecchi browser: niente */}
+    }
+  }, [cat]);
+  const scegliCategoria = c => {
+    setCat(c);
+    setSub(null);
+    if (!haProdotti(c, forn)) setForn('Tutti');
+  };
+  const scegliFornitore = f => {
+    setForn(f);
+    setSub(null);
+    if (!haProdotti(cat, f)) {
+      const c2 = categorie.find(c => haProdotti(c, f));
+      if (c2) setCat(c2);
+    }
+  };
   const salvaRinomina = async () => {
     if (!rinomina) return;
     setRinomina(r => ({
@@ -5606,20 +5645,15 @@ function FpvCatalogo({
   }, categorie.map(c => /*#__PURE__*/React.createElement("button", {
     key: c,
     type: "button",
-    onClick: () => {
-      setCat(c);
-      setSub(null);
-    },
+    onClick: () => scegliCategoria(c),
+    "data-cat-attiva": cat === c ? '1' : undefined,
     className: 'shrink-0 h-9 px-4 rounded-full text-[14px] font-semibold ' + (cat === c ? 'bg-[#111113] text-white' : 'bg-white border border-[#E6E6EB] text-[#111113]')
   }, c))), /*#__PURE__*/React.createElement("div", {
     className: "mt-2 flex gap-1 overflow-x-auto chips-scroll -mx-4 px-4"
   }, fornitori.map(f => /*#__PURE__*/React.createElement("button", {
     key: f,
     type: "button",
-    onClick: () => {
-      setForn(f);
-      setSub(null);
-    },
+    onClick: () => scegliFornitore(f),
     className: 'shrink-0 h-8 px-3 rounded-full text-[12.5px] font-semibold ' + (forn === f ? 'bg-[#E6E6EB] text-[#111113]' : 'text-[#6E6E78]')
   }, f))))), caricamento && prodotti.length === 0 ? /*#__PURE__*/React.createElement("div", {
     className: "mt-1"
