@@ -24,6 +24,27 @@
 <meta name="format-detection" content="telephone=no, date=no, email=no, address=no">
 <meta name="description" content="Preventivi e catalogo Ferari Impianti, gestionale per il cantiere.">
 <title>Ferari Impianti</title>
+<script>
+/* Vecchio indirizzo (GitHub Pages): solo un avviso con il link alla nuova app. Non sposta
+   nessuno da solo, perché le bozze dei preventivi stanno nel telefono, indirizzo per indirizzo. */
+(function () {
+  try {
+    if (location.hostname !== 'rfdigitall.github.io') return;
+    var nuovo = 'https://app.ferarimpianti.it/' + location.search + location.hash;
+    document.addEventListener('DOMContentLoaded', function () {
+      var b = document.createElement('div');
+      b.id = 'avviso-nuovo-indirizzo';
+      b.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;gap:12px;background:#111113;color:#fff;font:600 14px/1.3 Geist,-apple-system,system-ui,sans-serif;padding:calc(10px + env(safe-area-inset-top)) 14px 10px';
+      var t = document.createElement('span'); t.textContent = 'L’app ha un nuovo indirizzo.';
+      var a = document.createElement('a'); a.href = nuovo; a.textContent = 'Apri la nuova app'; a.style.cssText = 'color:#fff;text-decoration:underline';
+      var x = document.createElement('button'); x.type = 'button'; x.textContent = '×'; x.setAttribute('aria-label', 'Chiudi');
+      x.style.cssText = 'background:none;border:0;color:#fff;font-size:22px;line-height:1;padding:0 4px;cursor:pointer';
+      x.onclick = function () { b.remove(); };
+      b.appendChild(t); b.appendChild(a); b.appendChild(x); document.body.appendChild(b);
+    });
+  } catch (e) {}
+})();
+</script>
 <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" crossorigin></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -262,7 +283,7 @@ const{useState,useEffect,useCallback,useRef}=React;/* ==========================
 // numero con quello del file appena pubblicato online e, se sono diversi,
 // avvisa l'utente che c'è una versione nuova invece di restare bloccato
 // sulla vecchia copia in cache del telefono.
-const APP_VERSION='202610221200';// R10 (chiesto da Denis: dopo un push non si vedeva conferma che l'app si
+const APP_VERSION='202610271400';// R10 (chiesto da Denis: dopo un push non si vedeva conferma che l'app si
 // fosse aggiornata) — TENTATIVO IN SOSPESO, non ancora funzionante: la
 // logica per mostrare un avviso "aggiornato" dopo un reload è stata provata
 // in più forme (evento, flag di modulo, ritardo) ma il toast non arrivava
